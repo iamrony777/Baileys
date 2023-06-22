@@ -1,12 +1,17 @@
 import { Boom } from '@hapi/boom'
+import 'dotenv/config';
 import parsePhoneNumber from 'libphonenumber-js'
 import NodeCache from 'node-cache'
 import readline from 'readline'
-import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, getAggregateVotesInPollMessage, makeCacheableSignalKeyStore, makeInMemoryStore, PHONENUMBER_MCC, proto, useMultiFileAuthState, WAMessageContent, WAMessageKey } from '../src'
-import MAIN_LOGGER from '../src/Utils/logger'
+import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, getAggregateVotesInPollMessage, makeCacheableSignalKeyStore, makeInMemoryStore, makeMongoStore,useMongoDBAuthState, PHONENUMBER_MCC, proto, useMultiFileAuthState, WAMessageContent, WAMessageKey, AuthenticationState, Browsers, SignalKeyStore } from '../lib'
+import MAIN_LOGGER from '../lib/Utils/logger'
+import { MongoClient } from 'mongodb'
 
+const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
+  });
+  
 const logger = MAIN_LOGGER.child({})
-logger.level = 'trace'
+logger.level = 'debug'
 
 const useStore = !process.argv.includes('--no-store')
 const doReplies = !process.argv.includes('--no-reply')
@@ -24,23 +29,33 @@ store?.readFromFile('./baileys_store_multi.json')
 setInterval(() => {
 	store?.writeToFile('./baileys_store_multi.json')
 }, 10_000)
-
+// 
 // start a connection
+
+// const store = makeMongoStore( { logger, db: mongoClient.db("whatsapp-sessions") })
+// store?.readFromDb("chats")
 const startSock = async() => {
-	const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
+	// const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
 	// fetch latest version of WA Web
 	const { version, isLatest } = await fetchLatestBaileysVersion()
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
+	await mongoClient.connect();
+    const collection = mongoClient.db("whatsapp-sessions").collection("client");
+    const { state, saveCreds } = await useMongoDBAuthState(collection);
 
 	const sock = makeWASocket({
+		waWebSocketUrl: new URL('wss://web.whatsapp.com/ws/chat') ,
+		browser: Browsers.ubuntu('Chrome'),
 		version,
+		defaultQueryTimeoutMs: 60 * 1000, 
 		logger,
 		printQRInTerminal: true,
 		mobile: useMobile,
+		// auth: state,
 		auth: {
 			creds: state.creds,
 			/** caching makes the store faster to send/recv messages */
-			keys: makeCacheableSignalKeyStore(state.keys, logger),
+			keys: makeCacheableSignalKeyStore(state.keys as SignalKeyStore, logger),
 		},
 		msgRetryCounterCache,
 		generateHighQualityLinkPreview: true,
@@ -258,4 +273,9 @@ const startSock = async() => {
 	}
 }
 
-startSock()
+
+try {
+	startSock()
+} catch (e) {
+	startSock()
+}

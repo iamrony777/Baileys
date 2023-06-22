@@ -217,7 +217,7 @@ export default (
 				labelAssociations.delete(association)
 				break
 			default:
-				console.error(`unknown operation type [${type}]`)
+				logger.error(`unknown operation type [${type}]`)
 			}
 		})
 
