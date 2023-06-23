@@ -7,9 +7,7 @@ import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBa
 import MAIN_LOGGER from '../lib/Utils/logger'
 import { MongoClient } from 'mongodb'
 
-const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
-  });
-  
+
 const logger = MAIN_LOGGER.child({})
 logger.level = 'debug'
 
@@ -32,19 +30,23 @@ setInterval(() => {
 // 
 // start a connection
 
-// const store = makeMongoStore( { logger, db: mongoClient.db("whatsapp-sessions") })
-// store?.readFromDb("chats")
 const startSock = async() => {
 	// const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
 	// fetch latest version of WA Web
 	const { version, isLatest } = await fetchLatestBaileysVersion()
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
+
+
+	// Use mongodb to store auth info
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
+	});
 	await mongoClient.connect();
     const collection = mongoClient.db("whatsapp-sessions").collection("client");
     const { state, saveCreds } = await useMongoDBAuthState(collection);
 
+	
+
 	const sock = makeWASocket({
-		waWebSocketUrl: new URL('wss://web.whatsapp.com/ws/chat') ,
 		browser: Browsers.ubuntu('Chrome'),
 		version,
 		defaultQueryTimeoutMs: 60 * 1000, 
@@ -55,7 +57,7 @@ const startSock = async() => {
 		auth: {
 			creds: state.creds,
 			/** caching makes the store faster to send/recv messages */
-			keys: makeCacheableSignalKeyStore(state.keys as SignalKeyStore, logger),
+			keys: makeCacheableSignalKeyStore(state.keys, logger),
 		},
 		msgRetryCounterCache,
 		generateHighQualityLinkPreview: true,

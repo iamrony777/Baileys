@@ -75,6 +75,7 @@ npm manifest:
       "@hapi/boom": "^9.1.3",
       "axios": "^1.3.3",
       "cache-manager": "^5.2.2",
+      "dotenv": "^16.3.1",
       "futoin-hkdf": "^1.5.1",
       "libphonenumber-js": "^1.10.20",
       "libsignal": "https://github.com/adiwajshing/libsignal-node.git",
@@ -2882,6 +2883,11 @@ Lockfile:
     "version" "6.0.1"
     dependencies:
       "is-obj" "^2.0.0"
+  
+  "dotenv@^16.3.1":
+    "integrity" "sha512-IPzF4w4/Rd94bA9imS68tZBaYyBWSCE47V1RGuMrB94iyTOIEwRmVL2x/4An+6mETpLrKJ5hQkB8W4kFAadeIQ=="
+    "resolved" "https://registry.npmjs.org/dotenv/-/dotenv-16.3.1.tgz"
+    "version" "16.3.1"
   
   "duplexify@^4.1.2":
     "integrity" "sha512-fz3OjcNCHmRP12MJoZMPglx8m4rrFP8rovnk4vT8Fs+aonZoCwGg10dSsQsfP/E62eZcPTMSMP6686fu9Qlqtw=="

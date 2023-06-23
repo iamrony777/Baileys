@@ -1,17 +1,26 @@
-import WAProto from "../../WAProto";
-import { AuthenticationCreds, AuthenticationState } from "../Types/Auth";
+import { proto } from "../../WAProto";
+import { AuthenticationCreds, AuthenticationState, SignalDataTypeMap } from "../Types";
 import { initAuthCreds } from "./auth-utils";
-import { BufferJSON} from "./generics"; 
-import type { Collection, Document, UpdateResult } from "mongodb";
+import { BufferJSON } from "./generics";
+import type { Collection, Condition, Document, ObjectId } from "mongodb";
+import type { Logger } from 'pino'
 
-export const useMongoDBAuthState = async (collection: Collection<Document>): Promise<{ state: { creds: AuthenticationCreds, keys: { get: (type: string, ids: string[]) => Promise<Object> , set: (data: Object) => Promise<void> } }, saveCreds: () => Promise<Document | UpdateResult<Document>> }> => {
+export const useMongoDBAuthState = async (collection: Collection<Document>, logger?: Logger): Promise<{ state: AuthenticationState, saveCreds: () => Promise<void> }> => {
 
-    const writeData = (data: any, id: string) => {
-        return collection.replaceOne({id}, JSON.parse(JSON.stringify(data, BufferJSON.replacer)), {upsert: true});
+    const writeData = async (data: any, id: string) => {
+
+        logger?.debug({ id, data }, 'writing data')
+
+        await collection.replaceOne({ _id: id as unknown as Condition<ObjectId> }, JSON.parse(JSON.stringify(data, BufferJSON.replacer)), { upsert: true });
     };
     const readData = async (id: string) => {
+
+        logger?.debug({ id }, 'reading data')
+
         try {
-            const data = JSON.stringify(await collection.findOne({id}));
+            const data = JSON.stringify(await collection.findOne({ _id: id as unknown as Condition<ObjectId> }));
+
+            logger?.debug('data', data)
             return JSON.parse(data, BufferJSON.reviver);
         }
         catch (error) {
@@ -19,8 +28,10 @@ export const useMongoDBAuthState = async (collection: Collection<Document>): Pro
         }
     };
     const removeData = async (id: string) => {
+        logger?.debug({ id }, 'removing data')
+
         try {
-            await collection.deleteOne({id});
+            await collection.deleteOne({ _id: id as unknown as Condition<ObjectId> });
         }
         catch (_a) {
         }
@@ -30,32 +41,37 @@ export const useMongoDBAuthState = async (collection: Collection<Document>): Pro
         state: {
             creds,
             keys: {
-                get: async (type: string, ids: string[]) => {
-                    const data: Object = {};
-                    await Promise.all(ids.map(async (id: string | number) => {
+                get: async (type, ids: string[]) => {
+
+                    logger?.debug({ ids, type }, 'getting data')
+                    const data: { [_: string]: SignalDataTypeMap[typeof type] } = {}
+                    await Promise.all(ids.map(async id => {
                         let value = await readData(`${type}-${id}`);
-                        if (type === 'app-state-sync-key') {
-                            value =(WAProto.proto as any).AppStateSyncKeyData.fromObject(data);
+                        if (type === 'app-state-sync-key' && value) {
+                            value = proto.Message.AppStateSyncKeyData.fromObject(value);
                         }
                         data[id] = value;
                     }));
                     return data;
                 },
-                set: async (data: { [x: string]: { [x: string]: any; }; }) => {
-                    const tasks: any[] = [];
+                set: async (data) => {
+
+                    logger?.debug({ data }, 'setting data');
+                    const tasks: Promise<void>[] = [];
                     for (const category in data) {
                         for (const id in data[category]) {
-                            let _value = data[category][id];
-                            let _id = `${category}-${id}`;
-                            tasks.push(_value ? writeData(_value, _id) : removeData(id));
+                            let value = data[category][id];
+                            let collection = `${category}-${id}`;
+                            tasks.push(value ? writeData(value, collection) : removeData(collection));
                         }
                     }
                     await Promise.all(tasks);
                 }
             }
         },
-        saveCreds: () => {
-            return writeData(creds, 'creds');
+        saveCreds: async () => {
+            logger?.debug({ creds }, 'saving creds');
+            writeData(creds, 'creds');
         }
     };
 };
