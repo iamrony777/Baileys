@@ -15,7 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "lib": [
-      "es2020",
+      "ES2022",
       "esnext.array",
       "DOM"
     ]

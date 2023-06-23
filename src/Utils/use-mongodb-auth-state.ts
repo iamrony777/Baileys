@@ -8,17 +8,16 @@ import type { Logger } from 'pino'
 export const useMongoDBAuthState = async (collection: Collection<Document>, logger?: Logger): Promise<{ state: AuthenticationState, saveCreds: () => Promise<void> }> => {
 
     const writeData = async (data: any, id: string) => {
-
         logger?.debug({ id, data }, 'writing data')
+        
 
-        await collection.replaceOne({ _id: id as unknown as Condition<ObjectId> }, JSON.parse(JSON.stringify(data, BufferJSON.replacer)), { upsert: true });
+        await collection.replaceOne({ _id: id as unknown as Condition<ObjectId> }, JSON.parse(JSON.stringify({data: data}, BufferJSON.replacer)), { upsert: true });
     };
     const readData = async (id: string) => {
-
         logger?.debug({ id }, 'reading data')
 
         try {
-            const data = JSON.stringify(await collection.findOne({ _id: id as unknown as Condition<ObjectId> }));
+            const data = JSON.stringify((await collection.findOne({ _id: id as unknown as Condition<ObjectId> }))?.data);
 
             logger?.debug('data', data)
             return JSON.parse(data, BufferJSON.reviver);
