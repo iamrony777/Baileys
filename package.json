@@ -1,6 +1,6 @@
 {
   "name": "@whiskeysockets/baileys",
-  "version": "6.3.0",
+  "version": "6.3.1",
   "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
@@ -34,8 +34,8 @@
     "changelog:update": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
     "example": "node --inspect -r ts-node/register Example/example.ts",
     "gen:protobuf": "sh WAProto/GenerateStatics.sh",
-    "lint": "eslint . --ext .js,.ts,.jsx,.tsx",
-    "lint:fix": "eslint . --fix --ext .js,.ts,.jsx,.tsx",
+    "lint": "eslint src --ext .js,.ts,.jsx,.tsx",
+    "lint:fix": "eslint src --fix --ext .js,.ts,.jsx,.tsx",
     "prepack": "tsc",
     "prepare": "tsc",
     "release": "release-it",
@@ -53,6 +53,7 @@
     "libsignal": "github:adiwajshing/libsignal-node",
     "mongodb": "^5.6.0",
     "music-metadata": "^7.13.4",
+    "audio-decode": "^2.1.3",
     "node-cache": "^5.1.2",
     "pino": "^7.11.0",
     "protobufjs": "^6.11.3",
