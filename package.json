@@ -73,7 +73,7 @@
     "link-preview-js": "^3.0.4",
     "qrcode-terminal": "^0.12.0",
     "release-it": "^15.11.0",
-    "sharp": "^0.30.7",
+    "sharp": "^0.32.1",
     "ts-jest": "^27.1.5",
     "ts-node": "^10.9.1",
     "typedoc": "^0.24.8",
@@ -83,7 +83,7 @@
     "jimp": "^0.22.8",
     "link-preview-js": "^3.0.0",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.30.5"
+    "sharp": "^0.32.1"
   },
   "peerDependenciesMeta": {
     "jimp": {
