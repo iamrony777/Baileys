@@ -7,6 +7,8 @@ import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBa
 import MAIN_LOGGER from '../lib/Utils/logger'
 import { MongoClient } from 'mongodb'
 
+import open from 'open'
+import fs from 'fs'
 
 const logger = MAIN_LOGGER.child({})
 logger.level = 'debug'
@@ -51,13 +53,11 @@ const startSock = async() => {
 	
 
 	const sock = makeWASocket({
-		browser: Browsers.ubuntu('Chrome'),
 		version,
 		defaultQueryTimeoutMs: 60 * 1000, 
 		logger,
 		printQRInTerminal: !usePairingCode,
 		mobile: useMobile,
-		// auth: state,
 		auth: {
 			creds: state.creds,
 			/** caching makes the store faster to send/recv messages */
@@ -122,21 +122,38 @@ const startSock = async() => {
 			}
 		}
 
+		async function enterCaptcha() {
+			const response = await sock.requestRegistrationCode({ ...registration, method: 'captcha' })
+			const path = __dirname + '/captcha.png'
+			fs.writeFileSync(path, Buffer.from(response.image_blob!, 'base64'))
+
+			open(path)
+			const code = await question('Please enter the captcha code:\n')
+			fs.unlinkSync(path)
+			registration.captcha = code.replace(/["']/g, '').trim().toLowerCase()
+		}
+
 		async function askForOTP() {
-			let code = await question('How would you like to receive the one time code for registration? "sms" or "voice"\n')
-			code = code.replace(/["']/g, '').trim().toLowerCase()
+			if (!registration.method) {
+				let code = await question('How would you like to receive the one time code for registration? "sms" or "voice"\n')
+				code = code.replace(/["']/g, '').trim().toLowerCase()
+				if(code !== 'sms' && code !== 'voice') {
+					return await askForOTP()
+				}
 
-			if(code !== 'sms' && code !== 'voice') {
-				return await askForOTP()
+				registration.method = code
 			}
-
-			registration.method = code
 
 			try {
 				await sock.requestRegistrationCode(registration)
 				await enterCode()
 			} catch(error) {
 				console.error('Failed to request registration code. Please try again.\n', error)
+
+				if(error?.reason === 'code_checkpoint') {
+					await enterCaptcha()
+				}
+
 				await askForOTP()
 			}
 		}
