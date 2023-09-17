@@ -43,8 +43,7 @@ const startSock = async() => {
 
 
 	// Use mongodb to store auth info
-	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
-	});
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
 	await mongoClient.connect();
     const collection = mongoClient.db("whatsapp-sessions").collection("client");
     const { state, saveCreds } = await useMongoDBAuthState(collection, logger);
