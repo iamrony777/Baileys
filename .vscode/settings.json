@@ -20,7 +20,7 @@
         "fsharp": "fsi",
         "csharp": "scriptcs",
         "vbscript": "cscript //Nologo",
-        "typescript": "bun",
+        "typescript": "yarn exec ts-node",
         "coffeescript": "coffee",
         "scala": "scala",
         "swift": "swift",

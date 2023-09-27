@@ -11,6 +11,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   makeMongoStore,
   useMongoDBAuthState,
+  useRedisAuthState,
   PHONENUMBER_MCC,
   proto,
   useMultiFileAuthState,
@@ -19,12 +20,14 @@ import makeWASocket, {
   AuthenticationState,
   Browsers,
   SignalKeyStore,
+  makeInMemoryStore,
 } from "../lib";
 import MAIN_LOGGER from "../lib/Utils/logger";
 import { MongoClient } from "mongodb";
 
 import open from "open";
 import fs from "fs";
+import { Redis } from "ioredis";
 
 const logger = MAIN_LOGGER.child({});
 logger.level = "debug";
@@ -48,11 +51,12 @@ const question = (text: string) =>
 
 // the store maintains the data of the WA connection in memory
 // can be written out to a file & read from it
-// store?.readFromFile('./baileys_store_multi.json')
-// save every 10s
-// setInterval(() => {
-// 	store?.writeToFile('./baileys_store_multi.json')
-// }, 10_000)
+const store = useStore ? makeInMemoryStore({ logger }) : undefined
+store?.readFromFile('./baileys_store_multi.json')
+// // save every 10s
+setInterval(() => {
+  store?.writeToFile('./baileys_store_multi.json')
+}, 10_000)
 //
 // start a connection
 
@@ -62,15 +66,18 @@ const startSock = async () => {
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
 
-  // Use mongodb to store auth info
-  const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
-  await mongoClient.connect();
-  const collection = mongoClient.db("whatsapp-sessions").collection("client");
-  const { state, saveCreds } = await useMongoDBAuthState(collection, logger);
+  // // Use mongodb to store auth info
+  // const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
+  // await mongoClient.connect();
+  // const collection = mongoClient.db("whatsapp-sessions").collection("client");
+  // const { state, saveCreds } = await useMongoDBAuthState(collection, logger);
 
-  const store = useStore
-    ? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
-    : undefined;
+  // const store = useStore
+  //   ? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
+  //   : undefined;
+
+  // Use Redis to store auth info, and multiauthstore to store other data
+  const { state, saveCreds } = await useRedisAuthState(new Redis(process.env.REDIS_URL as string, { db: 0 }), 'wp', logger)
 
   const sock = makeWASocket({
     version,
@@ -132,8 +139,8 @@ const startSock = async () => {
     if (!mcc) {
       throw new Error(
         "Could not find MCC for phone number: " +
-          registration!.phoneNumber +
-          "\nPlease specify the MCC manually."
+        registration!.phoneNumber +
+        "\nPlease specify the MCC manually."
       );
     }
 
