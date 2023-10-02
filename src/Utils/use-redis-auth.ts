@@ -3,8 +3,8 @@
 	Original Author @kreivc (https://www.kreivc.com/)
 */
 
-import type { Redis } from 'ioredis'
 import type { Logger } from 'pino'
+import { createClient } from 'redis'
 import { proto } from '../../WAProto'
 import {
 	AuthenticationCreds,
@@ -14,8 +14,9 @@ import {
 import { initAuthCreds } from './auth-utils'
 import { BufferJSON } from './generics'
 
+
 export const useRedisAuthState = async(
-	redis: Redis,
+	redis: ReturnType<typeof createClient>,
 	prefix = 'wp',
 	logger?: Logger
 ): Promise<{
@@ -23,11 +24,12 @@ export const useRedisAuthState = async(
 	saveCreds: () => Promise<void>
 	removeCreds: () => Promise<void>
 }> => {
+	// TODO: im using ioredis (www.npmjs.com/package/ioredis). replace with redis library from (www.npmjs.com/package/redis)
 	const createKey = (key: string, prefix: string) => `${key}:${prefix}`
 	const writeData = async(key: string, field: string, data: any) => {
 		logger?.debug({ key: createKey(key, prefix), field, data }, 'writing data')
 
-		await redis.hset(
+		await redis.hSet(
 			createKey(key, prefix),
 			field,
 			JSON.stringify(data, BufferJSON.replacer)
@@ -35,7 +37,7 @@ export const useRedisAuthState = async(
 	}
 
 	const readData = async(key: string, field: string) => {
-		const data = await redis.hget(createKey(key, prefix), field)
+		const data = await redis.hGet(createKey(key, prefix), field)
 		logger?.debug({ key: createKey(key, prefix), data }, 'reading data')
 
 		return data ? JSON.parse(data, BufferJSON.reviver) : null
@@ -74,12 +76,12 @@ export const useRedisAuthState = async(
 							const field = `${category}-${id}`
 							tasks.push(
 								value
-									? redis.hset(
+									? redis.hSet(
 										createKey('authState', prefix),
 										field,
 										JSON.stringify(value, BufferJSON.replacer)
 									)
-									: redis.hdel(createKey('authState', prefix), field)
+									: redis.hDel(createKey('authState', prefix), field)
 							)
 						}
 					}
@@ -98,3 +100,4 @@ export const useRedisAuthState = async(
 		},
 	}
 }
+

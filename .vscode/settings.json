@@ -20,7 +20,7 @@
         "fsharp": "fsi",
         "csharp": "scriptcs",
         "vbscript": "cscript //Nologo",
-        "typescript": "yarn exec ts-node",
+        "typescript": "ts-node",
         "coffeescript": "coffee",
         "scala": "scala",
         "swift": "swift",
@@ -53,5 +53,6 @@
         "fortran": "cd $dir && gfortran $fileName -o $fileNameWithoutExt && $dir$fileNameWithoutExt",
         "sml": "cd $dir && sml $fileName"
     },
-    "code-runner.clearPreviousOutput": false
+    "code-runner.clearPreviousOutput": false,
+    "gitdoc.enabled": true
 }

@@ -20,3 +20,5 @@ TestData
 wa-logs.txt
 yarn.lock
 package-lock.json
+*.rdb
+*.store.json

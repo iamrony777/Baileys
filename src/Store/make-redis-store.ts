@@ -1,6 +1,8 @@
+// dumb hack
+import type KeyedDB from '@adiwajshing/keyed-db'
 import type { Comparable } from '@adiwajshing/keyed-db/lib/Types'
-import { Collection, Db } from 'mongodb'
 import type { Logger } from 'pino'
+import { createClient } from 'redis'
 import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
@@ -22,6 +24,7 @@ import {
 	MessageLabelAssociation,
 } from '../Types/LabelAssociation'
 import {
+	BufferJSON,
 	toNumber,
 	updateMessageWithReaction,
 	updateMessageWithReceipt,
@@ -34,11 +37,11 @@ type WASocket = ReturnType<typeof makeMDSocket>;
 
 export const waChatKey = (pin: boolean) => ({
 	key: (c: Chat) => (pin ? (c.pinned ? '1' : '0') : '') +
-    (c.archived ? '0' : '1') +
-    (c.conversationTimestamp
-    	? c.conversationTimestamp.toString(16).padStart(8, '0')
-    	: '') +
-    c.id,
+		(c.archived ? '0' : '1') +
+		(c.conversationTimestamp
+			? c.conversationTimestamp.toString(16).padStart(8, '0')
+			: '') +
+		c.id,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 })
 
@@ -51,11 +54,11 @@ export const waLabelAssociationKey: Comparable<LabelAssociation, string> = {
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 }
 
-export type BaileyesMongoStoreConfig = {
-  chatKey?: Comparable<Chat, string>
-  labelAssociationKey?: Comparable<LabelAssociation, string>
-  logger?: Logger
-  db: Db
+export type BaileysInMemoryStoreConfig = {
+	chatKey?: Comparable<Chat, string>
+	labelAssociationKey?: Comparable<LabelAssociation, string>
+	logger?: Logger
+	redis: ReturnType<typeof createClient>
 };
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
@@ -100,26 +103,30 @@ const predefinedLabels = Object.freeze<Record<string, Label>>({
 
 export default ({
 	logger: _logger,
-	db,
 	chatKey,
 	labelAssociationKey,
-}: BaileyesMongoStoreConfig) => {
+	redis,
+}: BaileysInMemoryStoreConfig) => {
 	chatKey = chatKey || waChatKey(true)
 	labelAssociationKey = labelAssociationKey || waLabelAssociationKey
 	const logger =
-    _logger ||
-    DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
-	const chats = db.collection<Chat>('chats')
+		_logger ||
+		DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis-store' })
+	const KeyedDB = require('@adiwajshing/keyed-db').default
+
+	const chats = new KeyedDB(chatKey, (c) => c.id) as KeyedDB<Chat, string>
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } =
-    {}
+		{}
 	const contacts: { [_: string]: Contact } = {}
 	const groupMetadata: { [_: string]: GroupMetadata } = {}
 	const presences: { [id: string]: { [participant: string]: PresenceData } } =
-    {}
+		{}
 	const state: ConnectionState = { connection: 'close' }
 	const labels = new ObjectRepository<Label>(predefinedLabels)
-	const labelAssociations: Collection<LabelAssociation> =
-    db.collection('labelAssociations')
+	const labelAssociations = new KeyedDB(
+		labelAssociationKey,
+		labelAssociationKey.key
+	) as KeyedDB<LabelAssociation, string>
 
 	const assertMessageList = (jid: string) => {
 		if(!messages[jid]) {
@@ -145,6 +152,12 @@ export default ({
 		}
 	}
 
+	/**
+	 * binds to a BaileysEventEmitter.
+	 * It listens to all events and constructs a state that you can query accurate data from.
+	 * Eg. can use the store to fetch chats, contacts, messages etc.
+	 * @param ev typically the event emitter from the socket connection
+	 */
 	const bind = (ev: BaileysEventEmitter) => {
 		ev.on('connection.update', (update) => {
 			Object.assign(state, update)
@@ -152,29 +165,21 @@ export default ({
 
 		ev.on(
 			'messaging-history.set',
-			async({
+			({
 				chats: newChats,
 				contacts: newContacts,
 				messages: newMessages,
 				isLatest,
 			}) => {
 				if(isLatest) {
-					chats.drop()
+					chats.clear()
 
 					for(const id in messages) {
 						delete messages[id]
 					}
 				}
 
-				const result = await Promise.all(
-					newChats.map((chat) => chats.updateOne(
-						{ id: chat.id },
-						{ $setOnInsert: chat },
-						{ upsert: true }
-					)
-					)
-				)
-				const chatsAdded = result.filter((r) => r.upsertedId)
+				const chatsAdded = chats.insertIfAbsent(...newChats).length
 				logger.debug({ chatsAdded }, 'synced chats')
 
 				const oldContacts = contactsUpsert(newContacts)
@@ -212,32 +217,20 @@ export default ({
 				}
 			}
 		})
-
-		const chatsCollection = db.collection('chats')
-
-		ev.on('chats.upsert', async(newChats) => {
-			const ops = newChats.map((chat) => {
-				return {
-					replaceOne: {
-						filter: { id: chat.id },
-						replacement: chat,
-						upsert: true,
-					},
-				}
-			})
-			await chatsCollection.bulkWrite(ops)
+		ev.on('chats.upsert', (newChats) => {
+			chats.upsert(...newChats)
 		})
+		ev.on('chats.update', (updates) => {
+			for(let update of updates) {
+				const result = chats.update(update.id!, (chat) => {
+					if(update.unreadCount! > 0) {
+						update = { ...update }
+						update.unreadCount = (chat.unreadCount || 0) + update.unreadCount!
+					}
 
-		ev.on('chats.update', async(updates) => {
-			for(const update of updates) {
-				const filter = { id: update.id }
-				// const options = { returnOriginal: false }
-
-				const chat = await chatsCollection.findOneAndUpdate(filter, {
-					$set: update,
+					Object.assign(chat, update)
 				})
-
-				if(!chat) {
+				if(!result) {
 					logger.debug({ update }, 'got update for non-existant chat')
 				}
 			}
@@ -256,19 +249,13 @@ export default ({
 			logger.error('Labels count exceed')
 		})
 
-		ev.on('labels.association', async({ type, association }) => {
+		ev.on('labels.association', ({ type, association }) => {
 			switch (type) {
 			case 'add':
-				await labelAssociations.updateOne(
-					{ id: association?.chatId || association?.labelId },
-					{ $set: association },
-					{ upsert: true }
-				)
+				labelAssociations.upsert(association)
 				break
 			case 'remove':
-				await labelAssociations.deleteOne({
-					id: association?.chatId || association?.labelId,
-				})
+				labelAssociations.delete(association)
 				break
 			default:
 				logger.error(`unknown operation type [${type}]`)
@@ -279,11 +266,11 @@ export default ({
 			presences[id] = presences[id] || {}
 			Object.assign(presences[id], update)
 		})
-
-		// TODO implement mongodb
 		ev.on('chats.delete', (deletions) => {
 			for(const item of deletions) {
-				chats.deleteOne({ id: item })
+				if(chats.get(item)) {
+					chats.deleteById(item)
+				}
 			}
 		})
 		ev.on('messages.upsert', ({ messages: newMessages, type }) => {
@@ -295,9 +282,8 @@ export default ({
 					const list = assertMessageList(jid)
 					list.upsert(msg, 'append')
 
-					const chat = chats.findOne({ id: jid })
 					if(type === 'notify') {
-						if(!chat) {
+						if(!chats.get(jid)) {
 							ev.emit('chats.upsert', [
 								{
 									id: jid,
@@ -312,7 +298,6 @@ export default ({
 				break
 			}
 		})
-
 		ev.on('messages.update', (updates) => {
 			for(const { update, key } of updates) {
 				const list = assertMessageList(jidNormalizedUser(key.remoteJid!))
@@ -422,20 +407,15 @@ export default ({
 		labelAssociations,
 	})
 
-	// TODO: replace upsert logic by corresponding mongodb collection methods
-	const fromJSON = async(json: {
-    chats: Chat[]
-    contacts: { [id: string]: Contact }
-    messages: { [id: string]: WAMessage[] }
-    labels: { [labelId: string]: Label }
-    labelAssociations: LabelAssociation[]
-  }) => {
-		await chats.updateMany({}, { $set: { ...json.chats } }, { upsert: true })
-		await labelAssociations.updateMany(
-			{},
-			{ $set: { ...(json.labelAssociations || []) } },
-			{ upsert: true }
-		)
+	const fromJSON = (json: {
+		chats: Chat[]
+		contacts: { [id: string]: Contact }
+		messages: { [id: string]: WAMessage[] }
+		labels: { [labelId: string]: Label }
+		labelAssociations: LabelAssociation[]
+	}) => {
+		chats.upsert(...json.chats)
+		labelAssociations.upsert(...(json.labelAssociations || []))
 		contactsUpsert(Object.values(json.contacts))
 		labelsUpsert(Object.values(json.labels || {}))
 		for(const jid in json.messages) {
@@ -493,37 +473,35 @@ export default ({
 			return messages
 		},
 		/**
-     * Get all available labels for profile
-     *
-     * Keep in mind that the list is formed from predefined tags and tags
-     * that were "caught" during their editing.
-     */
+		 * Get all available labels for profile
+		 *
+		 * Keep in mind that the list is formed from predefined tags and tags
+		 * that were "caught" during their editing.
+		 */
 		getLabels: () => {
 			return labels
 		},
 
 		/**
-     * Get labels for chat
-     *
-     * @returns Label IDs
-     **/
+		 * Get labels for chat
+		 *
+		 * @returns Label IDs
+		 **/
 		getChatLabels: (chatId: string) => {
-			return labelAssociations.findOne(
-				(la: { chatId: string }) => la.chatId === chatId
-			)
+			return labelAssociations.filter((la) => la.chatId === chatId).all()
 		},
 
 		/**
-     * Get labels for message
-     *
-     * @returns Label IDs
-     **/
-		getMessageLabels: async(messageId: string) => {
-			const associations = labelAssociations.find(
-				(la: MessageLabelAssociation) => la.messageId === messageId
-			)
+		 * Get labels for message
+		 *
+		 * @returns Label IDs
+		 **/
+		getMessageLabels: (messageId: string) => {
+			const associations = labelAssociations
+				.filter((la: MessageLabelAssociation) => la.messageId === messageId)
+				.all()
 
-			return associations?.map(({ labelId }) => labelId)
+			return associations.map(({ labelId }) => labelId)
 		},
 		loadMessage: async(jid: string, id: string) => messages[jid]?.get(id),
 		mostRecentMessage: async(jid: string) => {
@@ -569,32 +547,110 @@ export default ({
 		},
 		toJSON,
 		fromJSON,
+		uploadToDb: async(suffix = 'store') => {
+			const jsonData = toJSON()
 
-		// TODO: write to mongodb collection
-		writeToDb: (collection: string) => {
-			// require fs here so that in case "fs" is not available -- the app does not crash
+			for(const key of Object.keys(jsonData) as Array<keyof typeof jsonData>) {
+				// per type create a hash
 
-			//   const jsonStr = JSON.stringify(toJSON());
-	  db.collection(collection).insertOne(toJSON())
+				switch (key) {
+				case 'chats':
+					// @ts-ignore
+					for(const chat of jsonData['chats'].array as unknown as Chat[]) {
+						await redis.hSet(
+							`${key}:${suffix}`,
+							chat.id,
+							JSON.stringify(chat, BufferJSON.replacer)
+						)
+					}
+
+					break
+				case 'contacts':
+					const contacts = jsonData['contacts']
+					for(const contact of Object.values(
+						contacts
+					) as unknown as Contact[]) {
+						await redis.hSet(
+							`${key}:${suffix}`,
+							contact.id,
+							JSON.stringify(contact, BufferJSON.replacer)
+						)
+					}
+
+					break
+				case 'messages':
+					const messages = jsonData['messages']
+					for(const msgKey of Object.keys(messages)) {
+						await redis.hSet(
+							`${key}:${suffix}`,
+							msgKey,
+							JSON.stringify(messages[msgKey], BufferJSON.replacer)
+						)
+					}
+
+					break
+				case 'labelAssociations':
+				case 'labels':
+					await redis.set(
+						`${key}:${suffix}`,
+						JSON.stringify(jsonData[key], BufferJSON.replacer)
+					)
+					break
+				}
+			}
 		},
-		readFromDb: async(collection: string) => {
-			// require fs here so that in case "fs" is not available -- the app does not crash
-			//   const { readFileSync, existsSync } = require("fs");
-			//   if (existsSync(path)) {
-			//     logger.debug({ path }, "reading from file");
-			//     const jsonStr = readFileSync(path, { encoding: "utf-8" });
-			//     const json = JSON.parse(jsonStr);
-			//     fromJSON(json);
-			//   }
-
-			// @ts-ignore
-			const d = await db.collection(collection).find({ }, { _id: 0 }).toArray()?.[0]
-
-			if(d) {
-				fromJSON(d)
+		readFromDb: async(suffix = 'store') => {
+			const jsonObject: {
+				chats: Object[]
+				contacts: {}
+				messages: {}
+				labels: []
+				labelAssociations: []
+			} = {
+				chats: [],
+				contacts: {},
+				messages: {},
+				labels: [],
+				labelAssociations: [],
 			}
 
+			for(const key of [
+				'chats',
+				'contacts',
+				'messages',
+				'labels',
+				'labelAssociations',
+			] as const) {
+				let tempObj: any
+				switch (key) {
+				case 'chats':
+					tempObj = await redis.hGetAll(`${key}:${suffix}`)
+					for(const id of Object.keys(tempObj)) {
+						jsonObject['chats'].push(
+							JSON.parse(tempObj[id], BufferJSON.reviver)
+						)
+					}
 
+					break
+				case 'contacts':
+				case 'messages':
+					tempObj = await redis.hGetAll(`${key}:${suffix}`)
+					for(const id of Object.keys(tempObj)) {
+						jsonObject[key][id] = JSON.parse(tempObj[id], BufferJSON.reviver)
+					}
+
+					break
+				case 'labels':
+				case 'labelAssociations':
+					jsonObject[key] =
+							JSON.parse(
+								await redis.get(`${key}:${suffix}`) || '[]',
+								BufferJSON.reviver
+							) || []
+				}
+			}
+
+			fromJSON(jsonObject as any)
 		},
 	}
 }

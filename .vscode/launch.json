@@ -8,8 +8,10 @@
             "name": "ts-node",
             "type": "node",
             "request": "launch",
+            "console": "integratedTerminal",
             "args": [
-                "${relativeFile}"
+                "${relativeFile}",
+                "--no-reply"
             ],
             "runtimeArgs": [
                 "-r",
