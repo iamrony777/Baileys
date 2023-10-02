@@ -111,7 +111,7 @@ export default ({
 	labelAssociationKey = labelAssociationKey || waLabelAssociationKey
 	const logger =
 		_logger ||
-		DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis-store' })
+		DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis:store' })
 	const KeyedDB = require('@adiwajshing/keyed-db').default
 
 	const chats = new KeyedDB(chatKey, (c) => c.id) as KeyedDB<Chat, string>
@@ -548,6 +548,10 @@ export default ({
 		toJSON,
 		fromJSON,
 		uploadToDb: async(suffix = 'store') => {
+			if(!redis.isReady) {
+				await redis.connect()
+			}
+
 			const jsonData = toJSON()
 
 			for(const key of Object.keys(jsonData) as Array<keyof typeof jsonData>) {
@@ -600,6 +604,10 @@ export default ({
 			}
 		},
 		readFromDb: async(suffix = 'store') => {
+			if(!redis.isReady) {
+				await redis.connect()
+			}
+
 			const jsonObject: {
 				chats: Object[]
 				contacts: {}

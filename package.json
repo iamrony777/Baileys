@@ -1,5 +1,5 @@
 {
-  "name": "@whiskeysockets/baileys",
+  "name": "@iamrony777/baileys",
   "version": "6.5.0",
   "description": "WhatsApp API",
   "keywords": [
@@ -12,9 +12,12 @@
     "automation",
     "multi-device"
   ],
-  "homepage": "https://github.com/WhiskeySockets/Baileys",
+  "homepage": "https://github.com/iamrony777/Baileys",
   "repository": {
-    "url": "git@github.com:WhiskeySockets/Baileys.git"
+    "url": "git@github.com:iamrony777/Baileys.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "license": "MIT",
   "author": "Adhiraj Singh",

@@ -62,7 +62,6 @@ const startSock = async() => {
 	// await mongoClient.connect();
 	// const collection = mongoClient.db("whatsapp-sessions").collection("client");
 	// const { state, saveCreds } = await useMongoDBAuthState(collection, logger);
-
 	// const store = useStore
 	//   ? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
 	//   : undefined;

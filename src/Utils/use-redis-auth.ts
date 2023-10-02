@@ -17,36 +17,33 @@ import { BufferJSON } from './generics'
 
 export const useRedisAuthState = async(
 	redis: ReturnType<typeof createClient>,
-	prefix = 'wp',
+	suffix = 'store',
 	logger?: Logger
 ): Promise<{
 	state: AuthenticationState
 	saveCreds: () => Promise<void>
 	removeCreds: () => Promise<void>
 }> => {
-	// TODO: im using ioredis (www.npmjs.com/package/ioredis). replace with redis library from (www.npmjs.com/package/redis)
-	const createKey = (key: string, prefix: string) => `${key}:${prefix}`
+	const createKey = (key: string, suffix: string) => `${key}:${suffix}`
 	const writeData = async(key: string, field: string, data: any) => {
-		logger?.debug({ key: createKey(key, prefix), field, data }, 'writing data')
+		logger?.debug({ key: createKey(key, suffix), field, data }, 'writing data')
 
 		await redis.hSet(
-			createKey(key, prefix),
+			createKey(key, suffix),
 			field,
 			JSON.stringify(data, BufferJSON.replacer)
 		)
 	}
 
 	const readData = async(key: string, field: string) => {
-		const data = await redis.hGet(createKey(key, prefix), field)
-		logger?.debug({ key: createKey(key, prefix), data }, 'reading data')
+		const data = await redis.hGet(createKey(key, suffix), field)
+		logger?.debug({ key: createKey(key, suffix), data }, 'reading data')
 
 		return data ? JSON.parse(data, BufferJSON.reviver) : null
 	}
 
-	const deleteData = async(key: string) => await redis.del(createKey('authState', key))
-
 	const creds: AuthenticationCreds =
-		(await readData('authState', 'creds')) || initAuthCreds()
+		(await readData('auth', 'creds')) || initAuthCreds()
 
 	return {
 		state: {
@@ -57,7 +54,7 @@ export const useRedisAuthState = async(
 					const data: { [_: string]: SignalDataTypeMap[typeof type] } = {}
 					await Promise.all(
 						ids.map(async(id: string | number) => {
-							let value = await readData('authState', `${type}-${id}`)
+							let value = await readData('auth', `${type}-${id}`)
 							if(type === 'app-state-sync-key' && value) {
 								value = proto.Message.AppStateSyncKeyData.fromObject(value)
 							}
@@ -77,11 +74,11 @@ export const useRedisAuthState = async(
 							tasks.push(
 								value
 									? redis.hSet(
-										createKey('authState', prefix),
+										createKey('auth', suffix),
 										field,
 										JSON.stringify(value, BufferJSON.replacer)
 									)
-									: redis.hDel(createKey('authState', prefix), field)
+									: redis.hDel(createKey('auth', suffix), field)
 							)
 						}
 					}
@@ -92,11 +89,11 @@ export const useRedisAuthState = async(
 		},
 		saveCreds: async() => {
 			logger?.debug({ creds }, 'saving creds')
-			await writeData('authState', 'creds', creds)
+			await writeData('auth', 'creds', creds)
 		},
 		removeCreds: async() => {
 			logger?.debug('deleting creds')
-			await deleteData('authState')
+			await redis.del(createKey('auth', suffix))
 		},
 	}
 }
