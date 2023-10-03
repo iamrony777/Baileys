@@ -2,7 +2,7 @@
     "extends": "@adiwajshing",
     "parserOptions": {
         "sourceType": "module",
-        "project": "./tsconfig.json"
+        "project": "./tsconfig.eslint.json"
     },
     "ignorePatterns": ["src/Tests/*"],
     "rules": {

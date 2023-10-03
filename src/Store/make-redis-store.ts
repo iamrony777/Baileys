@@ -59,6 +59,7 @@ export type BaileysInMemoryStoreConfig = {
 	labelAssociationKey?: Comparable<LabelAssociation, string>
 	logger?: Logger
 	redis: ReturnType<typeof createClient>
+	suffix?: string
 };
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
@@ -106,9 +107,11 @@ export default ({
 	chatKey,
 	labelAssociationKey,
 	redis,
+	suffix
 }: BaileysInMemoryStoreConfig) => {
 	chatKey = chatKey || waChatKey(true)
 	labelAssociationKey = labelAssociationKey || waLabelAssociationKey
+	suffix = suffix || 'store'
 	const logger =
 		_logger ||
 		DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis:store' })
@@ -490,7 +493,13 @@ export default ({
 		getChatLabels: (chatId: string) => {
 			return labelAssociations.filter((la) => la.chatId === chatId).all()
 		},
-
+		getContactInfo: async(chatId: string) => {
+			const contacts = await redis.hGet(
+				`contacts:${suffix}`,
+				chatId
+			)
+			return contacts ? JSON.parse(contacts, BufferJSON.reviver) as Contact : null
+		},
 		/**
 		 * Get labels for message
 		 *
@@ -547,7 +556,7 @@ export default ({
 		},
 		toJSON,
 		fromJSON,
-		uploadToDb: async(suffix = 'store') => {
+		uploadToDb: async() => {
 			if(!redis.isReady) {
 				await redis.connect()
 			}
@@ -603,7 +612,7 @@ export default ({
 				}
 			}
 		},
-		readFromDb: async(suffix = 'store') => {
+		readFromDb: async() => {
 			if(!redis.isReady) {
 				await redis.connect()
 			}

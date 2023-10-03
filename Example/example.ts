@@ -69,15 +69,15 @@ const startSock = async() => {
 	// Use Redis to store auth info, and multiauthstore to store other data
 	const client = await createClient({
 		url: process.env.REDIS_URL,
-		database: 2,
+		database: 0,
 	}).connect()
 	const { state, saveCreds } = await useRedisAuthState(client, 'store', logger)
 	const store = useStore
 		? makeRedisStore({ logger, redis: client })
 		: undefined
-	store?.readFromDb()
-	setInterval(() => {
-		store?.uploadToDb()
+	await store?.readFromDb()
+	setInterval(async() => {
+		await store?.uploadToDb()
 	}, 10_000)
 
 	const sock = makeWASocket({
