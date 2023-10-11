@@ -1,4 +1,4 @@
-## [6.5.3](https://github.com/iamrony777/Baileys/compare/v6.5.2...v6.5.3) (2023-10-03)
+## [6.5.4](https://github.com/iamrony777/Baileys/compare/v6.5.2...v6.5.4) (2023-10-11)
 
 
 
@@ -458,8 +458,6 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/iamrony777/Baileys/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/iamrony777/Baileys/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/iamrony777/Baileys/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-* Revert "feat: resync main app state on first open" ([2cc5cc2](https://github.com/iamrony777/Baileys/commit/2cc5cc2dd4424b4aeed700f62b4b59e6a3e3856e))
-* Revert "fix: remove redundant collectionSync" ([85574d1](https://github.com/iamrony777/Baileys/commit/85574d1d795f32f75f98dfd9ef52242960c68f2b))
 * example logger ([d9a4dae](https://github.com/iamrony777/Baileys/commit/d9a4dae23580444b87384f62d71b4d78fd84df4d))
 
 
