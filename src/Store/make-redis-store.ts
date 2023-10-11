@@ -33,10 +33,11 @@ import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
 import { ObjectRepository } from './object-repository'
 
-type WASocket = ReturnType<typeof makeMDSocket>;
+type WASocket = ReturnType<typeof makeMDSocket>
 
 export const waChatKey = (pin: boolean) => ({
-	key: (c: Chat) => (pin ? (c.pinned ? '1' : '0') : '') +
+	key: (c: Chat) =>
+		(pin ? (c.pinned ? '1' : '0') : '') +
 		(c.archived ? '0' : '1') +
 		(c.conversationTimestamp
 			? c.conversationTimestamp.toString(16).padStart(8, '0')
@@ -48,9 +49,10 @@ export const waChatKey = (pin: boolean) => ({
 export const waMessageID = (m: WAMessage) => m.key.id || ''
 
 export const waLabelAssociationKey: Comparable<LabelAssociation, string> = {
-	key: (la: LabelAssociation) => la.type === LabelAssociationType.Chat
-		? la.chatId + la.labelId
-		: la.chatId + la.messageId + la.labelId,
+	key: (la: LabelAssociation) =>
+		la.type === LabelAssociationType.Chat
+			? la.chatId + la.labelId
+			: la.chatId + la.messageId + la.labelId,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 }
 
@@ -60,7 +62,7 @@ export type BaileysInMemoryStoreConfig = {
 	logger?: Logger
 	redis: ReturnType<typeof createClient>
 	suffix?: string
-};
+}
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
 
@@ -107,14 +109,13 @@ export default ({
 	chatKey,
 	labelAssociationKey,
 	redis,
-	suffix
+	suffix,
 }: BaileysInMemoryStoreConfig) => {
 	chatKey = chatKey || waChatKey(true)
 	labelAssociationKey = labelAssociationKey || waLabelAssociationKey
 	suffix = suffix || 'store'
 	const logger =
-		_logger ||
-		DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis:store' })
+		_logger || DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis:store' })
 	const KeyedDB = require('@adiwajshing/keyed-db').default
 
 	const chats = new KeyedDB(chatKey, (c) => c.id) as KeyedDB<Chat, string>
@@ -342,10 +343,7 @@ export default ({
 				if (groupMetadata[id]) {
 					Object.assign(groupMetadata[id], update)
 				} else {
-					logger.debug(
-						{ update },
-						'got update for non-existant group metadata'
-					)
+					logger.debug({ update }, 'got update for non-existant group metadata')
 				}
 			}
 		})
@@ -457,9 +455,7 @@ export default ({
 			let messages: WAMessage[]
 			if (list && mode === 'before' && (!cursorKey || cursorValue)) {
 				if (cursorValue) {
-					const msgIdx = list.array.findIndex(
-						(m) => m.key.id === cursorKey?.id
-					)
+					const msgIdx = list.array.findIndex((m) => m.key.id === cursorKey?.id)
 					messages = list.array.slice(0, msgIdx)
 				} else {
 					messages = list.array
@@ -494,11 +490,10 @@ export default ({
 			return labelAssociations.filter((la) => la.chatId === chatId).all()
 		},
 		getContactInfo: async (chatId: string) => {
-			const contacts = await redis.hGet(
-				`contacts:${suffix}`,
-				chatId
-			)
-			return contacts ? JSON.parse(contacts, BufferJSON.reviver) as Contact : null
+			const contacts = await redis.hGet(`contacts:${suffix}`, chatId)
+			return contacts
+				? (JSON.parse(contacts, BufferJSON.reviver) as Contact)
+				: null
 		},
 		/**
 		 * Get labels for message
@@ -558,45 +553,63 @@ export default ({
 		fromJSON,
 		uploadToDb: async () => {
 			if (!redis.isReady) {
-				await redis.connect();
+				await redis.connect()
 			}
 
-			const jsonData = toJSON();
+			const jsonData = toJSON()
 
 			for (const key of Object.keys(jsonData) as Array<keyof typeof jsonData>) {
-				const data = jsonData[key];
-				const suffixKey = `${key}:${suffix}`;
+				const data = jsonData[key]
+				const suffixKey = `${key}:${suffix}`
 
 				switch (key) {
 					case 'chats':
 						// @ts-ignore
 						for (const chat of data.array as unknown as Chat[]) {
-							await redis.hSet(suffixKey, chat.id, JSON.stringify(chat, BufferJSON.replacer));
+							await redis.hSet(
+								suffixKey,
+								chat.id,
+								JSON.stringify(chat, BufferJSON.replacer)
+							)
 						}
-						break;
+
+						break
 
 					case 'contacts':
 						for (const contact of Object.values(data) as unknown as Contact[]) {
-							await redis.hSet(suffixKey, contact.id, JSON.stringify(contact, BufferJSON.replacer));
+							await redis.hSet(
+								suffixKey,
+								contact.id,
+								JSON.stringify(contact, BufferJSON.replacer)
+							)
 						}
-						break;
+
+						break
 
 					case 'messages':
 						for (const msgKey of Object.keys(data)) {
-							await redis.hSet(suffixKey, msgKey, JSON.stringify(data[msgKey], BufferJSON.replacer));
+							await redis.hSet(
+								suffixKey,
+								msgKey,
+								JSON.stringify(data[msgKey], BufferJSON.replacer)
+							)
 						}
-						break;
+
+						break
 
 					case 'labelAssociations':
 					case 'labels':
-						await redis.set(suffixKey, JSON.stringify(data, BufferJSON.replacer));
-						break;
+						await redis.set(
+							suffixKey,
+							JSON.stringify(data, BufferJSON.replacer)
+						)
+						break
 				}
 			}
 		},
 		readFromDb: async () => {
 			if (!redis.isReady) {
-				await redis.connect();
+				await redis.connect()
 			}
 
 			const jsonObject = {
@@ -605,33 +618,33 @@ export default ({
 				messages: {},
 				labels: [],
 				labelAssociations: [],
-			};
+			}
 
 			const readObjectFromDb = async (key: string) => {
-				const tempObj = await redis.hGetAll(`${key}:${suffix}`);
+				const tempObj = await redis.hGetAll(`${key}:${suffix}`)
 				const parsedObj = Object.keys(tempObj).map((id) =>
 					JSON.parse(tempObj[id], BufferJSON.reviver)
-				);
-				jsonObject[key] = parsedObj;
-			};
+				)
+				jsonObject[key] = parsedObj
+			}
 
 			const readArrayFromDb = async (key: string) => {
 				const parsedArray = JSON.parse(
-					(await redis.get(`${key}:${suffix}`)) || "[]",
+					(await redis.get(`${key}:${suffix}`)) || '[]',
 					BufferJSON.reviver
-				);
-				jsonObject[key] = parsedArray;
-			};
+				)
+				jsonObject[key] = parsedArray
+			}
 
 			await Promise.all([
-				readObjectFromDb("chats"),
-				readObjectFromDb("contacts"),
-				readObjectFromDb("messages"),
-				readArrayFromDb("labels"),
-				readArrayFromDb("labelAssociations"),
-			]);
+				readObjectFromDb('chats'),
+				readObjectFromDb('contacts'),
+				readObjectFromDb('messages'),
+				readArrayFromDb('labels'),
+				readArrayFromDb('labelAssociations'),
+			])
 
-			fromJSON(jsonObject as any);
-		}
+			fromJSON(jsonObject as any)
+		},
 	}
 }

@@ -1,12 +1,13 @@
 import { Boom } from '@hapi/boom'
 import fs from 'fs'
 import NodeCache from 'node-cache'
-import open from 'open'
 import readline from 'readline'
+import { MongoClient } from 'mongodb'
 import { createClient } from 'redis'
 import 'dotenv/config'
 import makeWASocket, {
 	AnyMessageContent,
+	Browsers,
 	delay,
 	DisconnectReason,
 	fetchLatestBaileysVersion,
@@ -18,7 +19,8 @@ import makeWASocket, {
 	useRedisAuthState,
 	WAMessageContent,
 	WAMessageKey,
-	Browsers
+	makeMongoStore,
+	useMongoDBAuthState
 } from '../src'
 import MAIN_LOGGER from '../src/Utils/logger'
 
@@ -59,29 +61,32 @@ const startSock = async () => {
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
 	// // Use mongodb to store auth info
-	// const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
-	// await mongoClient.connect();
-	// const collection = mongoClient.db("whatsapp-sessions").collection("client");
-	// const { state, saveCreds } = await useMongoDBAuthState(collection, logger);
-	// const store = useStore
-	//   ? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
-	//   : undefined;
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
+	await mongoClient.connect();
+	const { state, saveCreds } = await useMongoDBAuthState(mongoClient.db("whatsapp-sessions").collection("client"), logger);
+	const store = useStore
+		? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
+		: undefined;
+	// await store?.readFromDb('store')
+	// setInterval(async() => {
+	// 	await store?.writeToDb('store')
+	// }, 60 * 1000)
 
 	// Use Redis to store auth info, and multiauthstore to store other data
-	const url = new URL(process.env.REDIS_URL!)
-	const client = createClient({
-		url: url.href,
-		database: url.protocol === 'rediss:' ? 0 : 1,
-	})
-	await client.connect()
-	const { state, saveCreds } = await useRedisAuthState(client, 'store', logger)
-	const store = useStore
-		? makeRedisStore({ logger, redis: client })
-		: undefined
-	await store?.readFromDb()
-	setInterval(async () => {
-		await store?.uploadToDb()
-	}, 60*1000)
+	// const url = new URL(process.env.REDIS_URL!)
+	// const client = createClient({
+	// 	url: url.href,
+	// 	database: url.protocol === 'rediss:' ? 0 : 1,
+	// })
+	// await client.connect()
+	// const { state, saveCreds } = await useRedisAuthState(client, 'store', logger)
+	// const store = useStore
+	// 	? makeRedisStore({ logger, redis: client })
+	// 	: undefined
+	// await store?.readFromDb()
+	// setInterval(async() => {
+	// 	await store?.uploadToDb()
+	// }, 60 * 1000)
 
 	const sock = makeWASocket({
 		version,
@@ -291,10 +296,13 @@ const startSock = async () => {
 						if (!msg.key.fromMe && doReplies) {
 							console.log('replying to', msg.key.remoteJid)
 							await sock.readMessages([msg.key])
-							await sendMessageWTyping(
-								{ text: 'Hello there!' },
-								msg.key.remoteJid!
-							)
+							sock.sendMessage(
+								msg.key.remoteJid!,
+								{
+									text: `Hi`,
+								},
+								{ ephemeralExpiration: 1 * 60 }
+							);
 						}
 					}
 				}
@@ -337,14 +345,12 @@ const startSock = async () => {
 			}
 
 			if (events['contacts.update']) {
-				for (const contact of events['contacts.update']) {
-					if (typeof contact.imgUrl !== 'undefined') {
-						const newUrl =
-							contact.imgUrl === null
-								? null
-								: await sock.profilePictureUrl(contact.id!).catch(() => null)
+				for (const update of events['contacts.update']) {
+
+					if (update.imgUrl === 'changed') {
+						const contact = await store?.getContactInfo(update.id!, sock)
 						console.log(
-							`contact ${contact.id} has a new profile pic: ${newUrl}`
+							`contact ${contact?.name} has a new profile pic: ${contact?.imgUrl}`
 						)
 					}
 				}

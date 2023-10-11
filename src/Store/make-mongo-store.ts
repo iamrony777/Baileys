@@ -1,5 +1,5 @@
 import type { Comparable } from '@adiwajshing/keyed-db/lib/Types'
-import { Collection, Db } from 'mongodb'
+import { Db } from 'mongodb'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
@@ -30,33 +30,35 @@ import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
 import { ObjectRepository } from './object-repository'
 
-type WASocket = ReturnType<typeof makeMDSocket>;
+type WASocket = ReturnType<typeof makeMDSocket>
 
 export const waChatKey = (pin: boolean) => ({
-	key: (c: Chat) => (pin ? (c.pinned ? '1' : '0') : '') +
-    (c.archived ? '0' : '1') +
-    (c.conversationTimestamp
-    	? c.conversationTimestamp.toString(16).padStart(8, '0')
-    	: '') +
-    c.id,
+	key: (c: Chat) =>
+		(pin ? (c.pinned ? '1' : '0') : '') +
+		(c.archived ? '0' : '1') +
+		(c.conversationTimestamp
+			? c.conversationTimestamp.toString(16).padStart(8, '0')
+			: '') +
+		c.id,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 })
 
 export const waMessageID = (m: WAMessage) => m.key.id || ''
 
 export const waLabelAssociationKey: Comparable<LabelAssociation, string> = {
-	key: (la: LabelAssociation) => la.type === LabelAssociationType.Chat
-		? la.chatId + la.labelId
-		: la.chatId + la.messageId + la.labelId,
+	key: (la: LabelAssociation) =>
+		la.type === LabelAssociationType.Chat
+			? la.chatId + la.labelId
+			: la.chatId + la.messageId + la.labelId,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 }
 
 export type BaileyesMongoStoreConfig = {
-  chatKey?: Comparable<Chat, string>
-  labelAssociationKey?: Comparable<LabelAssociation, string>
-  logger?: Logger
-  db: Db
-};
+	chatKey?: Comparable<Chat, string>
+	labelAssociationKey?: Comparable<LabelAssociation, string>
+	logger?: Logger
+	db: Db
+}
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
 
@@ -107,40 +109,30 @@ export default ({
 	chatKey = chatKey || waChatKey(true)
 	labelAssociationKey = labelAssociationKey || waLabelAssociationKey
 	const logger =
-    _logger ||
-    DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
+		_logger || DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
 	const chats = db.collection<Chat>('chats')
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } =
-    {}
-	const contacts: { [_: string]: Contact } = {}
+		{}
+	const contacts = db.collection<Contact>('contacts')
 	const groupMetadata: { [_: string]: GroupMetadata } = {}
 	const presences: { [id: string]: { [participant: string]: PresenceData } } =
-    {}
+		{}
 	const state: ConnectionState = { connection: 'close' }
 	const labels = new ObjectRepository<Label>(predefinedLabels)
-	const labelAssociations: Collection<LabelAssociation> =
-    db.collection('labelAssociations')
+	const labelAssociations =
+		db.collection<LabelAssociation>('labelAssociations')
 
 	const assertMessageList = (jid: string) => {
-		if(!messages[jid]) {
+		if (!messages[jid]) {
 			messages[jid] = makeMessagesDictionary()
 		}
 
 		return messages[jid]
 	}
 
-	const contactsUpsert = (newContacts: Contact[]) => {
-		const oldContacts = new Set(Object.keys(contacts))
-		for(const contact of newContacts) {
-			oldContacts.delete(contact.id)
-			contacts[contact.id] = Object.assign(contacts[contact.id] || {}, contact)
-		}
-
-		return oldContacts
-	}
 
 	const labelsUpsert = (newLabels: Label[]) => {
-		for(const label of newLabels) {
+		for (const label of newLabels) {
 			labels.upsertById(label.id, label)
 		}
 	}
@@ -152,44 +144,38 @@ export default ({
 
 		ev.on(
 			'messaging-history.set',
-			async({
+			async ({
 				chats: newChats,
 				contacts: newContacts,
 				messages: newMessages,
 				isLatest,
 			}) => {
-				if(isLatest) {
-					chats.drop()
+				if (isLatest) {
+					await chats.drop()
 
-					for(const id in messages) {
+					for (const id in messages) {
 						delete messages[id]
 					}
 				}
 
 				const result = await Promise.all(
-					newChats.map((chat) => chats.updateOne(
-						{ id: chat.id },
-						{ $setOnInsert: chat },
-						{ upsert: true }
-					)
+					newChats.map((chat) =>
+						chats.updateOne(
+							{ id: chat.id },
+							{ $setOnInsert: chat },
+							{ upsert: true }
+						)
 					)
 				)
 				const chatsAdded = result.filter((r) => r.upsertedId)
 				logger.debug({ chatsAdded }, 'synced chats')
-
-				const oldContacts = contactsUpsert(newContacts)
-				if(isLatest) {
-					for(const jid of oldContacts) {
-						delete contacts[jid]
-					}
-				}
-
+				const oldContacts = await contacts.insertMany(newContacts)
 				logger.debug(
-					{ deletedContacts: isLatest ? oldContacts.size : 0, newContacts },
+					{ deletedContacts: isLatest ? oldContacts.insertedCount : 0, newContacts },
 					'synced contacts'
 				)
 
-				for(const msg of newMessages) {
+				for (const msg of newMessages) {
 					const jid = msg.key.remoteJid!
 					const list = assertMessageList(jid)
 					list.upsert(msg, 'prepend')
@@ -199,23 +185,23 @@ export default ({
 			}
 		)
 
-		ev.on('contacts.upsert', (contacts) => {
-			contactsUpsert(contacts)
+		ev.on('contacts.upsert', async (Contacts) => {
+		await contacts.insertMany(Contacts)
 		})
 
-		ev.on('contacts.update', (updates) => {
-			for(const update of updates) {
-				if(contacts[update.id!]) {
-					Object.assign(contacts[update.id!], update)
+		ev.on('contacts.update', async (updates) => {
+			for (const update of updates) {
+				const ct = await contacts.findOne({id: update.id}, {projection: {_id: 0}});
+				if (ct) {
+					Object.assign(ct, update);
+					await contacts.updateOne({id: update.id}, { $set: {...ct} }, { upsert: true});
 				} else {
-					logger.debug({ update }, 'got update for non-existant contact')
+					logger.debug({ update }, 'got update for non-existent contact');
 				}
 			}
-		})
+		});
 
-		const chatsCollection = db.collection('chats')
-
-		ev.on('chats.upsert', async(newChats) => {
+		ev.on('chats.upsert', async (newChats) => {
 			const ops = newChats.map((chat) => {
 				return {
 					replaceOne: {
@@ -225,53 +211,51 @@ export default ({
 					},
 				}
 			})
-			await chatsCollection.bulkWrite(ops)
+			await chats.bulkWrite(ops)
 		})
 
-		ev.on('chats.update', async(updates) => {
-			for(const update of updates) {
-				const filter = { id: update.id }
-				// const options = { returnOriginal: false }
+		ev.on('chats.update', async (updates) => {
+			for (const update of updates) {
 
-				const chat = await chatsCollection.findOneAndUpdate(filter, {
+				const chat = await chats.findOneAndUpdate({ id: update.id }, {
 					$set: update,
-				})
+				}, {upsert: true})
 
-				if(!chat) {
+				if (!chat) {
 					logger.debug({ update }, 'got update for non-existant chat')
 				}
 			}
 		})
 
 		ev.on('labels.edit', (label: Label) => {
-			if(label.deleted) {
+			if (label.deleted) {
 				return labels.deleteById(label.id)
 			}
 
 			// WhatsApp can store only up to 20 labels
-			if(labels.count() < 20) {
+			if (labels.count() < 20) {
 				return labels.upsertById(label.id, label)
 			}
 
 			logger.error('Labels count exceed')
 		})
 
-		ev.on('labels.association', async({ type, association }) => {
+		ev.on('labels.association', async ({ type, association }) => {
 			switch (type) {
-			case 'add':
-				await labelAssociations.updateOne(
-					{ id: association?.chatId || association?.labelId },
-					{ $set: association },
-					{ upsert: true }
-				)
-				break
-			case 'remove':
-				await labelAssociations.deleteOne({
-					id: association?.chatId || association?.labelId,
-				})
-				break
-			default:
-				logger.error(`unknown operation type [${type}]`)
+				case 'add':
+					await labelAssociations.updateOne(
+						{ id: association?.chatId || association?.labelId },
+						{ $set: association },
+						{ upsert: true }
+					)
+					break
+				case 'remove':
+					await labelAssociations.deleteOne({
+						id: association?.chatId || association?.labelId,
+					})
+					break
+				default:
+					logger.error(`unknown operation type [${type}]`)
 			}
 		})
 
@@ -281,44 +265,44 @@ export default ({
 		})
 
 		// TODO implement mongodb
-		ev.on('chats.delete', (deletions) => {
-			for(const item of deletions) {
-				chats.deleteOne({ id: item })
+		ev.on('chats.delete', async (deletions) => {
+			for (const item of deletions) {
+				await chats.deleteOne({ id: item })
 			}
 		})
-		ev.on('messages.upsert', ({ messages: newMessages, type }) => {
+		ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
 			switch (type) {
-			case 'append':
-			case 'notify':
-				for(const msg of newMessages) {
-					const jid = jidNormalizedUser(msg.key.remoteJid!)
-					const list = assertMessageList(jid)
-					list.upsert(msg, 'append')
+				case 'append':
+				case 'notify':
+					for (const msg of newMessages) {
+						const jid = jidNormalizedUser(msg.key.remoteJid!)
+						const list = assertMessageList(jid)
+						list.upsert(msg, 'append')
 
-					const chat = chats.findOne({ id: jid })
-					if(type === 'notify') {
-						if(!chat) {
-							ev.emit('chats.upsert', [
-								{
-									id: jid,
-									conversationTimestamp: toNumber(msg.messageTimestamp),
-									unreadCount: 1,
-								},
-							])
+						const chat = await chats.findOne({ id: jid })
+						if (type === 'notify') {
+							if (!chat) {
+								ev.emit('chats.upsert', [
+									{
+										id: jid,
+										conversationTimestamp: toNumber(msg.messageTimestamp),
+										unreadCount: 1,
+									},
+								])
+							}
 						}
 					}
-				}
 
-				break
+					break
 			}
 		})
 
 		ev.on('messages.update', (updates) => {
-			for(const { update, key } of updates) {
+			for (const { update, key } of updates) {
 				const list = assertMessageList(jidNormalizedUser(key.remoteJid!))
-				if(update?.status) {
+				if (update?.status) {
 					const listStatus = list.get(key.id!)?.status
-					if(listStatus && update?.status <= listStatus) {
+					if (listStatus && update?.status <= listStatus) {
 						logger.debug(
 							{ update, storedStatus: listStatus },
 							'status stored newer then update'
@@ -329,19 +313,19 @@ export default ({
 				}
 
 				const result = list.updateAssign(key.id!, update)
-				if(!result) {
+				if (!result) {
 					logger.debug({ update }, 'got update for non-existent message')
 				}
 			}
 		})
 		ev.on('messages.delete', (item) => {
-			if('all' in item) {
+			if ('all' in item) {
 				const list = messages[item.jid]
 				list?.clear()
 			} else {
 				const jid = item.keys[0].remoteJid!
 				const list = messages[jid]
-				if(list) {
+				if (list) {
 					const idSet = new Set(item.keys.map((k) => k.id))
 					list.filter((m) => !idSet.has(m.key.id))
 				}
@@ -349,65 +333,62 @@ export default ({
 		})
 
 		ev.on('groups.update', (updates) => {
-			for(const update of updates) {
+			for (const update of updates) {
 				const id = update.id!
-				if(groupMetadata[id]) {
+				if (groupMetadata[id]) {
 					Object.assign(groupMetadata[id], update)
 				} else {
-					logger.debug(
-						{ update },
-						'got update for non-existant group metadata'
-					)
+					logger.debug({ update }, 'got update for non-existant group metadata')
 				}
 			}
 		})
 
 		ev.on('group-participants.update', ({ id, participants, action }) => {
 			const metadata = groupMetadata[id]
-			if(metadata) {
+			if (metadata) {
 				switch (action) {
-				case 'add':
-					metadata.participants.push(
-						...participants.map((id) => ({
-							id,
-							isAdmin: false,
-							isSuperAdmin: false,
-						}))
-					)
-					break
-				case 'demote':
-				case 'promote':
-					for(const participant of metadata.participants) {
-						if(participants.includes(participant.id)) {
-							participant.isAdmin = action === 'promote'
+					case 'add':
+						metadata.participants.push(
+							...participants.map((id) => ({
+								id,
+								isAdmin: false,
+								isSuperAdmin: false,
+							}))
+						)
+						break
+					case 'demote':
+					case 'promote':
+						for (const participant of metadata.participants) {
+							if (participants.includes(participant.id)) {
+								participant.isAdmin = action === 'promote'
+							}
 						}
-					}
 
-					break
-				case 'remove':
-					metadata.participants = metadata.participants.filter(
-						(p) => !participants.includes(p.id)
-					)
-					break
+						break
+					case 'remove':
+						metadata.participants = metadata.participants.filter(
+							(p) => !participants.includes(p.id)
+						)
+						break
 				}
 			}
 		})
 
 		ev.on('message-receipt.update', (updates) => {
-			for(const { key, receipt } of updates) {
+			for (const { key, receipt } of updates) {
 				const obj = messages[key.remoteJid!]
 				const msg = obj?.get(key.id!)
-				if(msg) {
+				if (msg) {
 					updateMessageWithReceipt(msg, receipt)
 				}
 			}
 		})
 
 		ev.on('messages.reaction', (reactions) => {
-			for(const { key, reaction } of reactions) {
+			for (const { key, reaction } of reactions) {
 				const obj = messages[key.remoteJid!]
 				const msg = obj?.get(key.id!)
-				if(msg) {
+				if (msg) {
 					updateMessageWithReaction(msg, reaction)
 				}
 			}
@@ -423,24 +404,31 @@ export default ({
 	})
 
 	// TODO: replace upsert logic by corresponding mongodb collection methods
-	const fromJSON = async(json: {
-    chats: Chat[]
-    contacts: { [id: string]: Contact }
-    messages: { [id: string]: WAMessage[] }
-    labels: { [labelId: string]: Label }
-    labelAssociations: LabelAssociation[]
-  }) => {
+	const fromJSON = async (json: {
+		chats: Chat[]
+		contacts: { [id: string]: Contact }
+		messages: { [id: string]: WAMessage[] }
+		labels: { [labelId: string]: Label }
+		labelAssociations: LabelAssociation[]
+	}) => {
 		await chats.updateMany({}, { $set: { ...json.chats } }, { upsert: true })
 		await labelAssociations.updateMany(
 			{},
 			{ $set: { ...(json.labelAssociations || []) } },
 			{ upsert: true }
 		)
-		contactsUpsert(Object.values(json.contacts))
+
+		// await writeFile('contacts.json', JSON.stringify(json.contacts, BufferJSON.replacer, 2))
+		// await writeFile('contacts_list.json', JSON.stringify({...Object.values(json.contacts)}, BufferJSON.replacer, 2))
+
+		const contactsCollection = db.collection<Contact>('contacts')
+		await contactsCollection.updateMany({}, { $set: { ...Object.values(json.contacts) } }, { upsert: true })
+
+		// contactsUpsert(Object.values(json.contacts))
 		labelsUpsert(Object.values(json.labels || {}))
-		for(const jid in json.messages) {
+		for (const jid in json.messages) {
 			const list = assertMessageList(jid)
-			for(const msg of json.messages[jid]) {
+			for (const msg of json.messages[jid]) {
 				list.upsert(proto.WebMessageInfo.fromObject(msg), 'append')
 			}
 		}
@@ -457,7 +445,7 @@ export default ({
 		labelAssociations,
 		bind,
 		/** loads messages from the store, if not found -- uses the legacy connection */
-		loadMessages: async(
+		loadMessages: async (
 			jid: string,
 			count: number,
 			cursor: WAMessageCursor
@@ -472,18 +460,16 @@ export default ({
 			const cursorValue = cursorKey ? list.get(cursorKey.id!) : undefined
 
 			let messages: WAMessage[]
-			if(list && mode === 'before' && (!cursorKey || cursorValue)) {
-				if(cursorValue) {
-					const msgIdx = list.array.findIndex(
-						(m) => m.key.id === cursorKey?.id
-					)
+			if (list && mode === 'before' && (!cursorKey || cursorValue)) {
+				if (cursorValue) {
+					const msgIdx = list.array.findIndex((m) => m.key.id === cursorKey?.id)
 					messages = list.array.slice(0, msgIdx)
 				} else {
 					messages = list.array
 				}
 
 				const diff = count - messages.length
-				if(diff < 0) {
+				if (diff < 0) {
 					messages = messages.slice(-count) // get the last X messages
 				}
 			} else {
@@ -493,20 +479,20 @@ export default ({
 			return messages
 		},
 		/**
-     * Get all available labels for profile
-     *
-     * Keep in mind that the list is formed from predefined tags and tags
-     * that were "caught" during their editing.
-     */
+		 * Get all available labels for profile
+		 *
+		 * Keep in mind that the list is formed from predefined tags and tags
+		 * that were "caught" during their editing.
+		 */
 		getLabels: () => {
 			return labels
 		},
 
 		/**
-     * Get labels for chat
-     *
-     * @returns Label IDs
-     **/
+		 * Get labels for chat
+		 *
+		 * @returns Label IDs
+		 **/
 		getChatLabels: (chatId: string) => {
 			return labelAssociations.findOne(
 				(la: { chatId: string }) => la.chatId === chatId
@@ -514,38 +500,52 @@ export default ({
 		},
 
 		/**
-     * Get labels for message
-     *
-     * @returns Label IDs
-     **/
-		getMessageLabels: async(messageId: string) => {
+		 * Get labels for message
+		 *
+		 * @returns Label IDs
+		 **/
+		getMessageLabels: async (messageId: string) => {
 			const associations = labelAssociations.find(
 				(la: MessageLabelAssociation) => la.messageId === messageId
 			)
 
 			return associations?.map(({ labelId }) => labelId)
 		},
-		loadMessage: async(jid: string, id: string) => messages[jid]?.get(id),
-		mostRecentMessage: async(jid: string) => {
+		loadMessage: async (jid: string, id: string) => messages[jid]?.get(id),
+		mostRecentMessage: async (jid: string) => {
 			const message: WAMessage | undefined = messages[jid]?.array.slice(-1)[0]
 			return message
 		},
-		fetchImageUrl: async(jid: string, sock: WASocket | undefined) => {
-			const contact = contacts[jid]
-			if(!contact) {
+		fetchImageUrl: async (jid: string, sock: WASocket | undefined) => {
+			const contact = await contacts.findOne({id: jid}, {projection: {_id: 0}})
+			if (!contact) {
 				return sock?.profilePictureUrl(jid)
 			}
 
-			if(typeof contact.imgUrl === 'undefined') {
+			if (typeof contact.imgUrl === 'undefined') {
 				contact.imgUrl = await sock?.profilePictureUrl(jid)
+				await contacts.updateOne({id: jid}, { $set: contact }, {upsert:true})
 			}
 
 			return contact.imgUrl
 		},
-		fetchGroupMetadata: async(jid: string, sock: WASocket | undefined) => {
-			if(!groupMetadata[jid]) {
+		getContactInfo: async (jid: string, socket?: WASocket) => {
+			const contact =  await contacts.findOne({id: jid}, {projection: {_id: 0}})
+
+			// if no contact.imgUrl is set, fetch it
+			if (contact?.imgUrl === 'changed') {
+				contact.imgUrl = await socket?.profilePictureUrl(jid, 'image')
+				await contacts.updateOne({id: jid}, { $set: contact }, {upsert:true})
+				return contact
+			}
+			return contact
+
+
+		},
+		fetchGroupMetadata: async (jid: string, sock: WASocket | undefined) => {
+			if (!groupMetadata[jid]) {
 				const metadata = await sock?.groupMetadata(jid)
-				if(metadata) {
+				if (metadata) {
 					groupMetadata[jid] = metadata
 				}
 			}
@@ -562,7 +562,7 @@ export default ({
 
 		// 	return groupMetadata[jid]
 		// },
-		fetchMessageReceipts: async({ remoteJid, id }: WAMessageKey) => {
+		fetchMessageReceipts: async ({ remoteJid, id }: WAMessageKey) => {
 			const list = messages[remoteJid!]
 			const msg = list?.get(id!)
 			return msg?.userReceipt
@@ -570,31 +570,31 @@ export default ({
 		toJSON,
 		fromJSON,
 
-		// TODO: write to mongodb collection
-		writeToDb: (collection: string) => {
-			// require fs here so that in case "fs" is not available -- the app does not crash
+		// // TODO: write to mongodb collection
+		// writeToDb: async (collection: string) => {
+		// 	// require fs here so that in case "fs" is not available -- the app does not crash
 
-			//   const jsonStr = JSON.stringify(toJSON());
-	  db.collection(collection).insertOne(toJSON())
-		},
-		readFromDb: async(collection: string) => {
-			// require fs here so that in case "fs" is not available -- the app does not crash
-			//   const { readFileSync, existsSync } = require("fs");
-			//   if (existsSync(path)) {
-			//     logger.debug({ path }, "reading from file");
-			//     const jsonStr = readFileSync(path, { encoding: "utf-8" });
-			//     const json = JSON.parse(jsonStr);
-			//     fromJSON(json);
-			//   }
+		// 	//   const jsonStr = JSON.stringify(toJSON());
+		// 	await db.collection(collection).insertOne(toJSON())
+		// },
+		// readFromDb: async (collection: string) => {
+		// 	// require fs here so that in case "fs" is not available -- the app does not crash
+		// 	//   const { readFileSync, existsSync } = require("fs");
+		// 	//   if (existsSync(path)) {
+		// 	//     logger.debug({ path }, "reading from file");
+		// 	//     const jsonStr = readFileSync(path, { encoding: "utf-8" });
+		// 	//     const json = JSON.parse(jsonStr);
+		// 	//     fromJSON(json);
+		// 	//   }
 
-			// @ts-ignore
-			const d = await db.collection(collection).find({ }, { _id: 0 }).toArray()?.[0]
+		// 	const d = await db
+		// 		.collection(collection) // @ts-ignore
+		// 		.find({}, { _id: 0 })
+		// 		.toArray()?.[0]
 
-			if(d) {
-				fromJSON(d)
-			}
-
-
-		},
+		// 	if (d) {
+		// 		fromJSON(d)
+		// 	}
+		// },
 	}
 }
