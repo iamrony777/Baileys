@@ -1,4 +1,4 @@
-## [6.5.4](https://github.com/iamrony777/Baileys/compare/v6.5.2...v6.5.4) (2023-10-11)
+## [6.5.5](https://github.com/iamrony777/Baileys/compare/v6.5.2...v6.5.5) (2023-10-13)
 
 
 
