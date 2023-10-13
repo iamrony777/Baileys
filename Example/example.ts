@@ -350,7 +350,7 @@ const startSock = async () => {
 					if (update.imgUrl === 'changed') {
 						const contact = await store?.getContactInfo(update.id!, sock)
 						console.log(
-							`contact ${contact?.name} has a new profile pic: ${contact?.imgUrl}`
+							`contact ${contact?.name} ${contact?.id} has a new profile pic: ${contact?.imgUrl}`
 						)
 					}
 				}

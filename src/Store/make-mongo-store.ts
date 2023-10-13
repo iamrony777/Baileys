@@ -137,7 +137,7 @@ export default ({
 		}
 	}
 
-	const bind = (ev: BaileysEventEmitter) => {
+	const bind = (ev: BaileysEventEmitter, socket?: WASocket) => {
 		ev.on('connection.update', (update) => {
 			Object.assign(state, update)
 		})
@@ -186,18 +186,20 @@ export default ({
 		)
 
 		ev.on('contacts.upsert', async (Contacts) => {
-		await contacts.insertMany(Contacts)
+			await contacts.insertMany(Contacts)
 		})
 
 		ev.on('contacts.update', async (updates) => {
 			for (const update of updates) {
-				const ct = await contacts.findOne({id: update.id}, {projection: {_id: 0}});
-				if (ct) {
-					Object.assign(ct, update);
-					await contacts.updateOne({id: update.id}, { $set: {...ct} }, { upsert: true});
+				const contact: Partial<Contact> | null = await contacts.findOne({ id: update.id }, { projection: { _id: 0 } });
+
+				if (contact) {
+					Object.assign(contact, update);
+					await contacts.updateOne({ id: update.id }, { $set: { ...contact } }, { upsert: true });
 				} else {
 					logger.debug({ update }, 'got update for non-existent contact');
 				}
+
 			}
 		});
 
@@ -219,7 +221,7 @@ export default ({
 
 				const chat = await chats.findOneAndUpdate({ id: update.id }, {
 					$set: update,
-				}, {upsert: true})
+				}, { upsert: true })
 
 				if (!chat) {
 					logger.debug({ update }, 'got update for non-existant chat')
@@ -270,6 +272,7 @@ export default ({
 				await chats.deleteOne({ id: item })
 			}
 		})
+
 		ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
 			switch (type) {
 				case 'append':
@@ -318,6 +321,7 @@ export default ({
 				}
 			}
 		})
+
 		ev.on('messages.delete', (item) => {
 			if ('all' in item) {
 				const list = messages[item.jid]
@@ -517,29 +521,36 @@ export default ({
 			return message
 		},
 		fetchImageUrl: async (jid: string, sock: WASocket | undefined) => {
-			const contact = await contacts.findOne({id: jid}, {projection: {_id: 0}})
+			const contact = await contacts.findOne({ id: jid }, { projection: { _id: 0 } })
 			if (!contact) {
 				return sock?.profilePictureUrl(jid)
 			}
 
 			if (typeof contact.imgUrl === 'undefined') {
 				contact.imgUrl = await sock?.profilePictureUrl(jid)
-				await contacts.updateOne({id: jid}, { $set: contact }, {upsert:true})
+				await contacts.updateOne({ id: jid }, { $set: contact }, { upsert: true })
 			}
 
 			return contact.imgUrl
 		},
-		getContactInfo: async (jid: string, socket?: WASocket) => {
-			const contact =  await contacts.findOne({id: jid}, {projection: {_id: 0}})
+		getContactInfo: async (jid: string, socket: WASocket): Promise<Partial<Contact> | null> => {
 
-			// if no contact.imgUrl is set, fetch it
-			if (contact?.imgUrl === 'changed') {
-				contact.imgUrl = await socket?.profilePictureUrl(jid, 'image')
-				await contacts.updateOne({id: jid}, { $set: contact }, {upsert:true})
-				return contact
+			const contact: Partial<Contact> | null = await contacts.findOne({ id: jid }, { projection: { _id: 0 } })
+
+			if (!contact) {
+				return {
+					id: jid,
+					imgUrl: await socket?.profilePictureUrl(jid),
+				}
 			}
-			return contact
 
+			// fetch image if required
+			if (typeof contact.imgUrl === 'undefined' || contact.imgUrl === 'changed') {
+				contact.imgUrl = await socket?.profilePictureUrl(contact.id!, 'image')
+				await contacts.updateOne({ id: jid }, { $set: { ...contact } }, { upsert: true })
+			}
+
+			return contact
 
 		},
 		fetchGroupMetadata: async (jid: string, sock: WASocket | undefined) => {
