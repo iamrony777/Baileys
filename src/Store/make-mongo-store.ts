@@ -29,6 +29,7 @@ import {
 import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
 import { ObjectRepository } from './object-repository'
+import { exit } from 'process'
 
 type WASocket = ReturnType<typeof makeMDSocket>
 
@@ -148,54 +149,58 @@ export default ({
 				chats: newChats,
 				contacts: newContacts,
 				messages: newMessages,
-				isLatest,
 			}) => {
-				if (isLatest) {
-					await chats.drop()
+				const chatsAdded =
 
-					for (const id in messages) {
-						delete messages[id]
-					}
-				}
+					await chats.bulkWrite(
+						newChats.map((chat) => {
+							return {
+								insertOne: {
+									document: chat
+								}
+							}
+						})
+					)
 
-				const chatsAdded = await chats.bulkWrite(
-					newChats.map((chat) => ({
-						updateOne: {
-							filter: { id: chat.id },
-							update: {$setOnInsert: chat},
-							upsert: true,
-						}
-					}))
+				logger.debug(
+					{ chatsAdded: chatsAdded.insertedCount },
+					'synced chats'
 				)
 
-				logger.debug({ chatsAdded: chatsAdded.insertedCount }, 'synced chats')
+				if (!chatsAdded.insertedCount) { throw new Error('no chats added') }
 
+				const oldContacts =
 
-				const oldContacts = await contacts.bulkWrite(
-					newContacts.map((contact) => ({
-						updateOne: {
-							filter: { id: contact.id },
-							update: {$setOnInsert: contact},
-							upsert: true,
-						}
-					}))
-				);
+					await contacts.bulkWrite(
+						newContacts.map((contact) => {
+							return {
+								insertOne: {
+									document: contact
+								}
+							}
+						})
+					)
 				logger.debug(
 					{ insertedContacts: oldContacts.insertedCount },
 					'synced contacts'
 				)
+
+				if (!oldContacts.insertedCount) { throw new Error('no contacts added') }
 
 				for (const msg of newMessages) {
 					const jid = msg.key.remoteJid!
 					const list = assertMessageList(jid)
 					list.upsert(msg, 'prepend')
 
+
 					const chat = await chats.findOne({ id: jid }, { projection: { _id: 0 } })
-					if (chat && chat.messages) {
-						chat.messages.push({message: msg})
+					if (chat) {
+						chat.messages ? chat.messages.push({ message: msg }) : (chat.messages = [
+							{ message: msg }
+						])
 						await chats.updateOne(
 							{ id: jid },
-							{ $setOnInsert: chat },
+							{ $set: chat },
 							{ upsert: true }
 						)
 					} else {
@@ -203,18 +208,21 @@ export default ({
 					}
 				}
 
-				logger.debug({ messages: newMessages.length }, 'synced messages')
+				logger.debug(
+					{ messages: newMessages.length },
+					'synced messages'
+				)
+
 			}
 		)
 
 		ev.on('contacts.upsert', async (Contacts) => {
-			await contacts.bulkWrite(Contacts.map(contact => ({
-				updateOne: {
-					filter: { id: contact.id },
-					update: { $setOnInsert: contact },
-					upsert: true
-				}
-			})))
+			for (const contact of Contacts) {
+				await contacts.updateOne({ id: contact.id }, { $set: contact }, { upsert: true })
+			}
+
+			logger?.debug({ contactsUpserted: Contacts.length }, 'contacts upserted')
+
 
 		})
 
@@ -226,13 +234,14 @@ export default ({
 					Object.assign(contact, update);
 					await contacts.updateOne({ id: update.id }, { $set: contact }, { upsert: true });
 				} else {
-					logger.debug({ update }, 'got update for non-existent contact');
+					logger.debug('got update for non-existent contact');
 				}
 
 			}
 		});
 
 		ev.on('chats.upsert', async (newChats) => {
+			// try {
 			await chats.bulkWrite(newChats.map((chat) => {
 				return {
 					updateOne: {
@@ -245,6 +254,7 @@ export default ({
 		})
 
 		ev.on('chats.update', async (updates) => {
+			// try {
 			for (const update of updates) {
 
 				const chat = await chats.findOneAndUpdate({ id: update.id }, {
@@ -252,7 +262,7 @@ export default ({
 				}, { upsert: true })
 
 				if (!chat) {
-					logger.debug({ update }, 'got update for non-existant chat')
+					logger.debug('got update for non-existant chat')
 				}
 			}
 		})
@@ -294,7 +304,6 @@ export default ({
 			Object.assign(presences[id], update)
 		})
 
-		// TODO implement mongodb
 		ev.on('chats.delete', async (deletions) => {
 			for (const item of deletions) {
 				await chats.deleteOne({ id: item })
@@ -302,6 +311,7 @@ export default ({
 		})
 
 		ev.on('messages.upsert', async ({ messages: newMessages, type }) => {
+			// try {
 			switch (type) {
 				case 'append':
 				case 'notify':
@@ -321,34 +331,20 @@ export default ({
 									},
 								])
 							} else {
-								// append to existing chat
-								// Database has only last meesage after loggin in.
-								// this code only appends new messages of current chat
-								// but doesn't contains whole message history
-								// although `list.array` has the whole messages stored, I need to find a way
-								// to insert `list.array` in chunk
-								if (chat.messages) {
-									chat.messages.push( { message: msg });
-									chats.updateOne(
-										{ id: jid },
-										{ $set: chat },
-										{ upsert: true }
-									)
-								} else {
-									chat.messages = [{ message: msg }];
-									chats.updateOne(
-										{ id: jid },
-										{ $set: chat },
-										{ upsert: true }
-									)
-								}
+								chat.messages ? chat.messages.push({ message: msg }) : chat.messages = [{ message: msg }]
+								await chats.updateOne(
+									{ id: jid },
+									{ $set: chat },
+									{ upsert: true }
+								)
 
 							}
 						}
 					}
 
-					break
+					break;
 			}
+
 		})
 
 		ev.on('messages.update', (updates) => {
@@ -368,7 +364,7 @@ export default ({
 
 				const result = list.updateAssign(key.id!, update)
 				if (!result) {
-					logger.debug({ update }, 'got update for non-existent message')
+					logger.debug('got update for non-existent message')
 				}
 			}
 		})
