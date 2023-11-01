@@ -22,3 +22,5 @@ yarn.lock
 package-lock.json
 *.rdb
 *.store.json
+# Sentry Config File
+.sentryclirc

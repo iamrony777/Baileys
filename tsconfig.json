@@ -15,11 +15,20 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
+
     "lib": [
       "ES2022",
       "esnext.array",
       "DOM"
-    ]
+    ],
+
+    "sourceMap": true,
+    "inlineSources": true,
+
+    // Set `sourceRoot` to  "/" to strip the build path prefix
+    // from generated source code references.
+    // This improves issue grouping in Sentry.
+    "sourceRoot": "/"
   },
   "include": [
     "./src/**/*.ts",

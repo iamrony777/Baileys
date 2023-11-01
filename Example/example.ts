@@ -23,9 +23,29 @@ import makeWASocket, {
 	useMongoDBAuthState
 } from '../src'
 import MAIN_LOGGER from '../src/Utils/logger'
-
 const logger = MAIN_LOGGER.child({})
 logger.level = 'debug'
+
+import * as Sentry from "@sentry/node";
+import { ProfilingIntegration } from "@sentry/profiling-node";
+
+if (process.env.SENTRY_DSN) {
+	logger.info('Sentry enabled')
+	Sentry.init({
+		dsn: process.env.SENTRY_DSN,
+		integrations: [
+		  new ProfilingIntegration(),
+		],
+		// Performance Monitoring
+		tracesSampleRate: 1.0,
+		// Set sampling rate for profiling - this is relative to tracesSampleRate
+		profilesSampleRate: 1.0,
+	  });
+}
+
+
+
+
 
 const useStore = !process.argv.includes('--no-store')
 const doReplies = !process.argv.includes('--no-reply')
@@ -61,7 +81,7 @@ const startSock = async () => {
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
 	// // Use mongodb to store auth info
-	const mongoClient = new MongoClient(process.env.MONGODB_URL as string);
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, { socketTimeoutMS: 1_00_000, connectTimeoutMS: 1_00_000, waitQueueTimeoutMS: 1_00_000 });
 	await mongoClient.connect();
 	const { state, saveCreds } = await useMongoDBAuthState(mongoClient.db("whatsapp-sessions").collection("client"), logger);
 	const store = useStore
@@ -90,7 +110,7 @@ const startSock = async () => {
 
 	const sock = makeWASocket({
 		version,
-		defaultQueryTimeoutMs: 60 * 1000,
+		defaultQueryTimeoutMs: undefined,
 		logger,
 		browser: Browsers.baileys('desktop'),
 		printQRInTerminal: !usePairingCode,
@@ -254,6 +274,9 @@ const startSock = async () => {
 						startSock()
 					} else {
 						console.log('Connection closed. You are logged out.')
+						await mongoClient.db("whatsapp-sessions").dropDatabase()
+						startSock()
+
 					}
 				}
 

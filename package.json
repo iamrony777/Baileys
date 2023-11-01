@@ -42,7 +42,8 @@
     "prepack": "tsc",
     "prepare": "tsc",
     "release": "release-it",
-    "test": "jest"
+    "test": "jest",
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org rony-wp-bot --project baileys ./lib && sentry-cli sourcemaps upload --org rony-wp-bot --project baileys ./lib"
   },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
@@ -69,6 +70,8 @@
   },
   "devDependencies": {
     "@adiwajshing/eslint-config": "github:adiwajshing/eslint-config",
+    "@sentry/node": "^7.77.0",
+    "@sentry/profiling-node": "^1.2.5",
     "@types/got": "^9.6.12",
     "@types/jest": "^29.5.5",
     "@types/node": "^20.8.4",

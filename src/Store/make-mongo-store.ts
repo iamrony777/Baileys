@@ -169,9 +169,19 @@ export default ({
 				)
 				const chatsAdded = result.filter((r) => r.upsertedId)
 				logger.debug({ chatsAdded }, 'synced chats')
-				const oldContacts = await contacts.insertMany(newContacts)
+
+
+				const oldContacts = await contacts.bulkWrite(
+					newContacts.map((contact) => ({
+						updateOne: {
+							filter: { id: contact.id },
+							update: { $set: contact },
+							upsert: true,
+						}
+					}))
+				);
 				logger.debug(
-					{ deletedContacts: isLatest ? oldContacts.insertedCount : 0, newContacts },
+					{ insertedContacts: oldContacts.insertedCount },
 					'synced contacts'
 				)
 
@@ -179,6 +189,18 @@ export default ({
 					const jid = msg.key.remoteJid!
 					const list = assertMessageList(jid)
 					list.upsert(msg, 'prepend')
+
+					const chat = await chats.findOne({ id: jid }, { projection: { _id: 0 } })
+					if (chat && chat.messages) {
+						chat.messages.push({message: msg})
+						await chats.updateOne(
+							{ id: jid },
+							{ $set: chat },
+							{ upsert: true }
+						)
+					}
+
+
 				}
 
 				logger.debug({ messages: newMessages.length }, 'synced messages')
@@ -186,7 +208,16 @@ export default ({
 		)
 
 		ev.on('contacts.upsert', async (Contacts) => {
-			await contacts.insertMany(Contacts)
+			await contacts.bulkWrite(Contacts.map(contact => ({
+				updateOne: {
+					filter: {
+						id: contact.id
+					},
+					update: { $set: contact },
+					upsert: true
+				}
+			})))
+
 		})
 
 		ev.on('contacts.update', async (updates) => {
