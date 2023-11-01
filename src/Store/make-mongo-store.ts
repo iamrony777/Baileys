@@ -1,5 +1,5 @@
 import type { Comparable } from '@adiwajshing/keyed-db/lib/Types'
-import { Db } from 'mongodb'
+import { AnyBulkWriteOperation, Db } from 'mongodb'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
@@ -204,7 +204,7 @@ export default ({
 		});
 
 		ev.on('chats.upsert', async (newChats) => {
-			const ops = newChats.map((chat) => {
+			const ops: AnyBulkWriteOperation<Chat>[] = newChats.map((chat) => {
 				return {
 					replaceOne: {
 						filter: { id: chat.id },
@@ -292,6 +292,29 @@ export default ({
 										unreadCount: 1,
 									},
 								])
+							} else {
+								// append to existing chat
+								// Database has only last meesage after loggin in.
+								// this code only appends new messages of current chat
+								// but doesn't contains whole message history
+								// although `list.array` has the whole messages stored, I need to find a way
+								// to insert `list.array` in chunk
+								if (chat.messages) {
+									chat.messages.push( { message: msg });
+									chats.updateOne(
+										{ id: jid },
+										{ $set: chat },
+										{ upsert: true }
+									)
+								} else {
+									chat.messages = [{ message: msg }];
+									chats.updateOne(
+										{ id: jid },
+										{ $set: chat },
+										{ upsert: true }
+									)
+								}
+
 							}
 						}
 					}

@@ -107,7 +107,7 @@ const startSock = async () => {
 		// shouldIgnoreJid: jid => isJidBroadcast(jid),
 		// implement to handle retries & poll updates
 		shouldSyncHistoryMessage: () => true,
-		syncFullHistory: false,
+		syncFullHistory: true,
 		getMessage,
 	})
 
