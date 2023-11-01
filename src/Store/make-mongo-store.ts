@@ -158,24 +158,24 @@ export default ({
 					}
 				}
 
-				const result = await Promise.all(
-					newChats.map((chat) =>
-						chats.updateOne(
-							{ id: chat.id },
-							{ $setOnInsert: chat },
-							{ upsert: true }
-						)
-					)
+				const chatsAdded = await chats.bulkWrite(
+					newChats.map((chat) => ({
+						updateOne: {
+							filter: { id: chat.id },
+							update: {$setOnInsert: chat},
+							upsert: true,
+						}
+					}))
 				)
-				const chatsAdded = result.filter((r) => r.upsertedId)
-				logger.debug({ chatsAdded }, 'synced chats')
+
+				logger.debug({ chatsAdded: chatsAdded.insertedCount }, 'synced chats')
 
 
 				const oldContacts = await contacts.bulkWrite(
 					newContacts.map((contact) => ({
 						updateOne: {
 							filter: { id: contact.id },
-							update: { $set: contact },
+							update: {$setOnInsert: contact},
 							upsert: true,
 						}
 					}))
@@ -195,12 +195,12 @@ export default ({
 						chat.messages.push({message: msg})
 						await chats.updateOne(
 							{ id: jid },
-							{ $set: chat },
+							{ $setOnInsert: chat },
 							{ upsert: true }
 						)
+					} else {
+						logger.debug({ jid }, 'chat not found')
 					}
-
-
 				}
 
 				logger.debug({ messages: newMessages.length }, 'synced messages')
@@ -210,10 +210,8 @@ export default ({
 		ev.on('contacts.upsert', async (Contacts) => {
 			await contacts.bulkWrite(Contacts.map(contact => ({
 				updateOne: {
-					filter: {
-						id: contact.id
-					},
-					update: { $set: contact },
+					filter: { id: contact.id },
+					update: { $setOnInsert: contact },
 					upsert: true
 				}
 			})))
@@ -226,7 +224,7 @@ export default ({
 
 				if (contact) {
 					Object.assign(contact, update);
-					await contacts.updateOne({ id: update.id }, { $set: { ...contact } }, { upsert: true });
+					await contacts.updateOne({ id: update.id }, { $set: contact }, { upsert: true });
 				} else {
 					logger.debug({ update }, 'got update for non-existent contact');
 				}
@@ -235,16 +233,15 @@ export default ({
 		});
 
 		ev.on('chats.upsert', async (newChats) => {
-			const ops: AnyBulkWriteOperation<Chat>[] = newChats.map((chat) => {
+			await chats.bulkWrite(newChats.map((chat) => {
 				return {
-					replaceOne: {
+					updateOne: {
 						filter: { id: chat.id },
-						replacement: chat,
+						update: { $set: chat },
 						upsert: true,
 					},
 				}
-			})
-			await chats.bulkWrite(ops)
+			}))
 		})
 
 		ev.on('chats.update', async (updates) => {
@@ -476,9 +473,6 @@ export default ({
 			{ upsert: true }
 		)
 
-		// await writeFile('contacts.json', JSON.stringify(json.contacts, BufferJSON.replacer, 2))
-		// await writeFile('contacts_list.json', JSON.stringify({...Object.values(json.contacts)}, BufferJSON.replacer, 2))
-
 		const contactsCollection = db.collection<Contact>('contacts')
 		await contactsCollection.updateMany({}, { $set: { ...Object.values(json.contacts) } }, { upsert: true })
 
@@ -617,16 +611,7 @@ export default ({
 
 			return groupMetadata[jid]
 		},
-		// fetchBroadcastListInfo: async(jid: string, sock: WASocket | undefined) => {
-		// 	if(!groupMetadata[jid]) {
-		// 		const metadata = await sock?.getBroadcastListInfo(jid)
-		// 		if(metadata) {
-		// 			groupMetadata[jid] = metadata
-		// 		}
-		// 	}
 
-		// 	return groupMetadata[jid]
-		// },
 		fetchMessageReceipts: async ({ remoteJid, id }: WAMessageKey) => {
 			const list = messages[remoteJid!]
 			const msg = list?.get(id!)
@@ -634,32 +619,5 @@ export default ({
 		},
 		toJSON,
 		fromJSON,
-
-		// // TODO: write to mongodb collection
-		// writeToDb: async (collection: string) => {
-		// 	// require fs here so that in case "fs" is not available -- the app does not crash
-
-		// 	//   const jsonStr = JSON.stringify(toJSON());
-		// 	await db.collection(collection).insertOne(toJSON())
-		// },
-		// readFromDb: async (collection: string) => {
-		// 	// require fs here so that in case "fs" is not available -- the app does not crash
-		// 	//   const { readFileSync, existsSync } = require("fs");
-		// 	//   if (existsSync(path)) {
-		// 	//     logger.debug({ path }, "reading from file");
-		// 	//     const jsonStr = readFileSync(path, { encoding: "utf-8" });
-		// 	//     const json = JSON.parse(jsonStr);
-		// 	//     fromJSON(json);
-		// 	//   }
-
-		// 	const d = await db
-		// 		.collection(collection) // @ts-ignore
-		// 		.find({}, { _id: 0 })
-		// 		.toArray()?.[0]
-
-		// 	if (d) {
-		// 		fromJSON(d)
-		// 	}
-		// },
 	}
 }
