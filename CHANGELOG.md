@@ -5,26 +5,6 @@
 # [6.5.0-1](https://github.com/iamrony777/Baileys/compare/v6.5.10...v6.5.0-1) (2023-11-02)
 
 
-
-## [6.5.10](https://github.com/iamrony777/Baileys/compare/v6.5.7...v6.5.10) (2023-11-01)
-
-
-
-## [6.5.7](https://github.com/iamrony777/Baileys/compare/v6.5.6...v6.5.7) (2023-11-01)
-
-
-
-## [6.5.6](https://github.com/iamrony777/Baileys/compare/v6.5.2...v6.5.6) (2023-11-01)
-
-
-
-## [6.5.2](https://github.com/iamrony777/Baileys/compare/v6.5.1...v6.5.2) (2023-10-03)
-
-
-
-## [6.5.1](https://github.com/iamrony777/Baileys/compare/07291d8ef69c886bd1aefb3b474a8b7553daebad...v6.5.1) (2023-10-02)
-
-
 ### Bug Fixes
 
 * "receivedPendingNotifications" not firing on zero offline notifications ([7d174ca](https://github.com/iamrony777/Baileys/commit/7d174ca77b3993b0f17c6215b934a35d026b4377))
