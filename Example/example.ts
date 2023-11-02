@@ -1,9 +1,8 @@
 import { Boom } from '@hapi/boom'
 import fs from 'fs'
+import { MongoClient } from 'mongodb'
 import NodeCache from 'node-cache'
 import readline from 'readline'
-import { MongoClient } from 'mongodb'
-import { createClient } from 'redis'
 import 'dotenv/config'
 import makeWASocket, {
 	AnyMessageContent,
@@ -13,23 +12,20 @@ import makeWASocket, {
 	fetchLatestBaileysVersion,
 	getAggregateVotesInPollMessage,
 	makeCacheableSignalKeyStore,
-	makeRedisStore,
+	makeMongoStore,
 	PHONENUMBER_MCC,
 	proto,
-	useRedisAuthState,
+	useMongoDBAuthState,
 	WAMessageContent,
-	WAMessageKey,
-	makeMongoStore,
-	useMongoDBAuthState
-} from '../src'
+	WAMessageKey } from '../src'
 import MAIN_LOGGER from '../src/Utils/logger'
 const logger = MAIN_LOGGER.child({})
 logger.level = 'debug'
 
-import * as Sentry from "@sentry/node";
-import { ProfilingIntegration } from "@sentry/profiling-node";
+import * as Sentry from '@sentry/node'
+import { ProfilingIntegration } from '@sentry/profiling-node'
 
-if (process.env.SENTRY_DSN) {
+if(process.env.SENTRY_DSN) {
 	logger.info('Sentry enabled')
 	Sentry.init({
 		dsn: process.env.SENTRY_DSN,
@@ -40,11 +36,8 @@ if (process.env.SENTRY_DSN) {
 		tracesSampleRate: 1.0,
 		// Set sampling rate for profiling - this is relative to tracesSampleRate
 		profilesSampleRate: 1.0,
-	  });
+	  })
 }
-
-
-
 
 
 const useStore = !process.argv.includes('--no-store')
@@ -74,19 +67,19 @@ const question = (text: string) => new Promise<string>((resolve) => rl.question(
 
 // start a connection
 
-const startSock = async () => {
+const startSock = async() => {
 	// const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
 	// fetch latest version of WA Web
 	const { version, isLatest } = await fetchLatestBaileysVersion()
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
 	// // Use mongodb to store auth info
-	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, { socketTimeoutMS: 1_00_000, connectTimeoutMS: 1_00_000, waitQueueTimeoutMS: 1_00_000 });
-	await mongoClient.connect();
-	const { state, saveCreds } = await useMongoDBAuthState(mongoClient.db("whatsapp-sessions").collection("client"));
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, { socketTimeoutMS: 1_00_000, connectTimeoutMS: 1_00_000, waitQueueTimeoutMS: 1_00_000 })
+	await mongoClient.connect()
+	const { state, saveCreds } = await useMongoDBAuthState(mongoClient.db('whatsapp-sessions').collection('client'))
 	const store = useStore
-		? makeMongoStore({ logger, db: mongoClient.db("whatsapp-sessions") })
-		: undefined;
+		? makeMongoStore({ logger, db: mongoClient.db('whatsapp-sessions') })
+		: undefined
 	// await store?.readFromDb('store')
 	// setInterval(async() => {
 	// 	await store?.writeToDb('store')
@@ -134,8 +127,8 @@ const startSock = async () => {
 	store?.bind(sock.ev)
 
 	// Pairing code for Web clients
-	if (usePairingCode && !sock.authState.creds.registered) {
-		if (useMobile) {
+	if(usePairingCode && !sock.authState.creds.registered) {
+		if(useMobile) {
 			throw new Error('Cannot use pairing code with mobile api')
 		}
 
@@ -147,10 +140,10 @@ const startSock = async () => {
 	}
 
 	// If mobile was chosen, ask for the code
-	if (useMobile && !sock.authState.creds.registered) {
+	if(useMobile && !sock.authState.creds.registered) {
 		const { registration } = sock.authState.creds || { registration: {} }
 
-		if (!registration.phoneNumber) {
+		if(!registration.phoneNumber) {
 			registration.phoneNumber = await question(
 				'Please enter your mobile phone number:\n'
 			)
@@ -160,7 +153,7 @@ const startSock = async () => {
 		const phoneNumber = libPhonenumber.parsePhoneNumber(
 			registration.phoneNumber
 		)
-		if (!phoneNumber?.isValid()) {
+		if(!phoneNumber?.isValid()) {
 			throw new Error('Invalid phone number: ' + registration.phoneNumber)
 		}
 
@@ -168,7 +161,7 @@ const startSock = async () => {
 		registration.phoneNumberCountryCode = phoneNumber.countryCallingCode
 		registration.phoneNumberNationalNumber = phoneNumber.nationalNumber
 		const mcc = PHONENUMBER_MCC[phoneNumber.countryCallingCode]
-		if (!mcc) {
+		if(!mcc) {
 			throw new Error(
 				'Could not find MCC for phone number: ' +
 				registration.phoneNumber +
@@ -187,7 +180,7 @@ const startSock = async () => {
 				console.log('Successfully registered your phone number.')
 				console.log(response)
 				rl.close()
-			} catch (error) {
+			} catch(error) {
 				console.error(
 					'Failed to register your phone number. Please try again.\n',
 					error
@@ -211,12 +204,12 @@ const startSock = async () => {
 		}
 
 		async function askForOTP() {
-			if (!registration.method) {
+			if(!registration.method) {
 				let code = await question(
 					'How would you like to receive the one time code for registration? "sms" or "voice"\n'
 				)
 				code = code.replace(/["']/g, '').trim().toLowerCase()
-				if (code !== 'sms' && code !== 'voice') {
+				if(code !== 'sms' && code !== 'voice') {
 					return await askForOTP()
 				}
 
@@ -226,13 +219,13 @@ const startSock = async () => {
 			try {
 				await sock.requestRegistrationCode(registration)
 				await enterCode()
-			} catch (error) {
+			} catch(error) {
 				console.error(
 					'Failed to request registration code. Please try again.\n',
 					error
 				)
 
-				if (error?.reason === 'code_checkpoint') {
+				if(error?.reason === 'code_checkpoint') {
 					await enterCaptcha()
 				}
 
@@ -243,7 +236,8 @@ const startSock = async () => {
 		askForOTP()
 	}
 
-	const sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const sendMessageWTyping = async(msg: AnyMessageContent, jid: string) => {
 		await sock.presenceSubscribe(jid)
 		await delay(500)
 
@@ -259,22 +253,22 @@ const startSock = async () => {
 	// efficiently in a batch
 	sock.ev.process(
 		// events is a map for event name => event data
-		async (events) => {
+		async(events) => {
 			// something about the connection changed
 			// maybe it closed, or we received all offline message or connection opened
-			if (events['connection.update']) {
+			if(events['connection.update']) {
 				const update = events['connection.update']
 				const { connection, lastDisconnect } = update
-				if (connection === 'close') {
+				if(connection === 'close') {
 					// reconnect if not logged out
-					if (
+					if(
 						(lastDisconnect?.error as Boom)?.output?.statusCode !==
 						DisconnectReason.loggedOut
 					) {
 						startSock()
 					} else {
 						console.log('Connection closed. You are logged out.')
-						await mongoClient.db("whatsapp-sessions").dropDatabase()
+						await mongoClient.db('whatsapp-sessions').dropDatabase()
 						startSock()
 
 					}
@@ -284,24 +278,24 @@ const startSock = async () => {
 			}
 
 			// credentials updated -- save them
-			if (events['creds.update']) {
+			if(events['creds.update']) {
 				await saveCreds()
 			}
 
-			if (events['labels.association']) {
+			if(events['labels.association']) {
 				console.log(events['labels.association'])
 			}
 
-			if (events['labels.edit']) {
+			if(events['labels.edit']) {
 				console.log(events['labels.edit'])
 			}
 
-			if (events.call) {
+			if(events.call) {
 				console.log('recv call event', events.call)
 			}
 
 			// history received
-			if (events['messaging-history.set']) {
+			if(events['messaging-history.set']) {
 				const { chats, contacts, messages, isLatest } =
 					events['messaging-history.set']
 				console.log(
@@ -310,35 +304,35 @@ const startSock = async () => {
 			}
 
 			// received a new message
-			if (events['messages.upsert']) {
+			if(events['messages.upsert']) {
 				const upsert = events['messages.upsert']
 				console.log('recv messages ', JSON.stringify(upsert, undefined, 2))
 
-				if (upsert.type === 'notify') {
-					for (const msg of upsert.messages) {
-						if (!msg.key.fromMe && doReplies) {
+				if(upsert.type === 'notify') {
+					for(const msg of upsert.messages) {
+						if(!msg.key.fromMe && doReplies) {
 							console.log('replying to', msg.key.remoteJid)
 							await sock.readMessages([msg.key])
 							sock.sendMessage(
 								msg.key.remoteJid!,
 								{
-									text: `Hi`,
+									text: 'Hi',
 								},
 								{ ephemeralExpiration: 1 * 60 }
-							);
+							)
 						}
 					}
 				}
 			}
 
 			// messages updated like status delivered, message deleted etc.
-			if (events['messages.update']) {
+			if(events['messages.update']) {
 				console.log(JSON.stringify(events['messages.update'], undefined, 2))
 
-				for (const { key, update } of events['messages.update']) {
-					if (update.pollUpdates) {
+				for(const { key, update } of events['messages.update']) {
+					if(update.pollUpdates) {
 						const pollCreation = await getMessage(key)
-						if (pollCreation) {
+						if(pollCreation) {
 							console.log(
 								'got poll update, aggregation: ',
 								getAggregateVotesInPollMessage({
@@ -351,26 +345,26 @@ const startSock = async () => {
 				}
 			}
 
-			if (events['message-receipt.update']) {
+			if(events['message-receipt.update']) {
 				console.log(events['message-receipt.update'])
 			}
 
-			if (events['messages.reaction']) {
+			if(events['messages.reaction']) {
 				console.log(events['messages.reaction'])
 			}
 
-			if (events['presence.update']) {
+			if(events['presence.update']) {
 				console.log(events['presence.update'])
 			}
 
-			if (events['chats.update']) {
+			if(events['chats.update']) {
 				console.log(events['chats.update'])
 			}
 
-			if (events['contacts.update']) {
-				for (const update of events['contacts.update']) {
+			if(events['contacts.update']) {
+				for(const update of events['contacts.update']) {
 
-					if (update.imgUrl === 'changed') {
+					if(update.imgUrl === 'changed') {
 						const contact = await store?.getContactInfo(update.id!, sock)
 						console.log(
 							`contact ${contact?.name} ${contact?.id} has a new profile pic: ${contact?.imgUrl}`
@@ -379,7 +373,7 @@ const startSock = async () => {
 				}
 			}
 
-			if (events['chats.delete']) {
+			if(events['chats.delete']) {
 				console.log('chats deleted ', events['chats.delete'])
 			}
 		}
@@ -390,7 +384,7 @@ const startSock = async () => {
 	async function getMessage(
 		key: WAMessageKey
 	): Promise<WAMessageContent | undefined> {
-		if (store) {
+		if(store) {
 			const msg = await store.loadMessage(key.remoteJid!, key.id!)
 			return msg?.message || undefined
 		}
@@ -402,6 +396,6 @@ const startSock = async () => {
 
 try {
 	startSock()
-} catch (e) {
+} catch(e) {
 	startSock()
 }

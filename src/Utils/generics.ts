@@ -19,6 +19,8 @@ export const Browsers = {
 	ubuntu: browser => ['Ubuntu', browser, '20.0.04'] as [string, string, string],
 	macOS: browser => ['Mac OS', browser, '10.15.7'] as [string, string, string],
 	baileys: browser => ['Baileys', browser, '4.0.0'] as [string, string, string],
+	/** https://github.com/WhiskeySockets/Baileys/pull/303  */
+	windows: browser => ['Windows', browser, '10.0.22621'] as [string, string, string],
 	/** The appropriate browser based on your OS & release */
 	appropriate: browser => [ PLATFORM_MAP[platform()] || 'Ubuntu', browser, release() ] as [string, string, string]
 }
@@ -43,7 +45,7 @@ export const BufferJSON = {
 
 export const getKeyAuthor = (
 	key: proto.IMessageKey | undefined | null,
-	meId: string = 'me'
+	meId = 'me'
 ) => (
 	(key?.fromMe ? meId : key?.participant || key?.remoteJid) || ''
 )
@@ -100,7 +102,7 @@ export const unixTimestampSeconds = (date: Date = new Date()) => Math.floor(date
 
 export type DebouncedTimeout = ReturnType<typeof debouncedTimeout>
 
-export const debouncedTimeout = (intervalMs: number = 1000, task?: () => void) => {
+export const debouncedTimeout = (intervalMs = 1000, task?: () => void) => {
 	let timeout: NodeJS.Timeout | undefined
 	return {
 		start: (newIntervalMs?: number, newTask?: () => void) => {

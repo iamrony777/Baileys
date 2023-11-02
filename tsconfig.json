@@ -32,6 +32,7 @@
   },
   "include": [
     "./src/**/*.ts",
+    "Example/example.ts"
   ],
   "exclude": [
     "node_modules",

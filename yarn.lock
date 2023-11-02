@@ -7,7 +7,7 @@
   resolved "https://registry.npmjs.org/@aashutoshrathi/word-wrap/-/word-wrap-1.2.6.tgz"
   integrity sha512-1Yjs2SvM8TflER/OD3cOjhWWOZb58A2t7wpE2S9XfBYTiIl+XFhQG2bjy4Pu1I+EAlCNUzRDYDdFwFYUKvXcIA==
 
-"@adiwajshing/eslint-config@github:adiwajshing/eslint-config":
+"@adiwajshing/eslint-config@https://github.com/adiwajshing/eslint-config":
   version "1.0.0"
   resolved "git+ssh://git@github.com/adiwajshing/eslint-config.git#dd6fbbce8bee82f051cd802efc522e393e0b23d0"
   dependencies:
@@ -2187,11 +2187,6 @@ buffer@^6.0.3:
   dependencies:
     base64-js "^1.3.1"
     ieee754 "^1.2.1"
-
-bun-types@1.0.5-canary.20231009T140142:
-  version "1.0.5-canary.20231009T140142"
-  resolved "https://registry.npmjs.org/bun-types/-/bun-types-1.0.5-canary.20231009T140142.tgz"
-  integrity sha512-5hT8WBXZ2ozdJt6s0nnnh4iQXn6xp9a7spbRYjapNxKjR3ckS5U2V347H3+XpaMVzc/a7D2I2KnKqIPO1R82kg==
 
 bundle-name@^3.0.0:
   version "3.0.0"
@@ -4969,7 +4964,7 @@ jest@^29.0.0, jest@^29.7.0:
     import-local "^3.0.2"
     jest-cli "^29.7.0"
 
-jimp@^0.22.10:
+jimp@^0.22.8:
   version "0.22.10"
   resolved "https://registry.npmjs.org/jimp/-/jimp-0.22.10.tgz"
   integrity sha512-lCaHIJAgTOsplyJzC1w/laxSxrbSsEBw4byKwXgUdMmh+ayPsnidTblenQm+IvhIs44Gcuvlb6pd2LQ0wcKaKg==
@@ -5126,7 +5121,7 @@ libphonenumber-js@^1.10.47:
   resolved "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.10.47.tgz"
   integrity sha512-b4t7VQDV29xx/ni+58yl9KWPGjnDLDXCeCTLrD4V8vDpObXZRZBrg7uX/HWZ7YXiJKqdBDGgc+barUUTNB6Slw==
 
-"libsignal@github:adiwajshing/libsignal-node":
+"libsignal@https://github.com/adiwajshing/libsignal-node":
   version "2.0.1"
   resolved "git+ssh://git@github.com/adiwajshing/libsignal-node.git#11dbd962ea108187c79a7c46fe4d6f790e23da97"
   dependencies:
@@ -5143,7 +5138,7 @@ lines-and-columns@^2.0.3:
   resolved "https://registry.npmjs.org/lines-and-columns/-/lines-and-columns-2.0.3.tgz"
   integrity sha512-cNOjgCnLB+FnvWWtyRTzmB3POJ+cXxTA81LoW7u8JdmhfXzriropYwpjShnz1QLLWsQwY7nIxoDmcPTwphDK9w==
 
-link-preview-js@^3.0.5:
+link-preview-js@^3.0.4:
   version "3.0.5"
   resolved "https://registry.npmjs.org/link-preview-js/-/link-preview-js-3.0.5.tgz"
   integrity sha512-tOPdmphcZPxhZJFpkXj1D9ANDmK+yC6VzHwfl/ypfi1ASJUvkWNVkf3ikGk6p8CWA5wg8XVWNl2G++BL1UlCPg==
@@ -5259,7 +5254,7 @@ long@^5.0.0:
   resolved "https://registry.npmjs.org/long/-/long-5.2.3.tgz"
   integrity sha512-lcHwpNoggQTObv5apGNCTdJrO69eHOZMi4BNC+rTLER8iHAqGrUVeLh/irVIM7zTw2bOXA8T6uNPeujwOLg/2Q==
 
-loose-envify@^1.4.0:
+loose-envify@^1.1.0, loose-envify@^1.4.0:
   version "1.4.0"
   resolved "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz"
   integrity sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==
@@ -6461,6 +6456,13 @@ react-is@^18.0.0:
   resolved "https://registry.npmjs.org/react-is/-/react-is-18.2.0.tgz"
   integrity sha512-xWGDIW6x921xtzPkhiULtthJHoJvBbF3q26fzloPCK0hsvxtPVelvftw3zjbHWSkR2km9Z+4uxbDDK/6Zw9B8w==
 
+react@^18.2.0:
+  version "18.2.0"
+  resolved "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
+  integrity sha512-/3IjMdb2L9QbBdWiW5e3P2/npwMBaU9mHCSCUzNln0ZCYbcfTsGbTJrU/kGemdH2IWmB2ioZ+zkxtmq6g09fGQ==
+  dependencies:
+    loose-envify "^1.1.0"
+
 read-pkg-up@^10.0.0:
   version "10.1.0"
   resolved "https://registry.npmjs.org/read-pkg-up/-/read-pkg-up-10.1.0.tgz"
@@ -6812,7 +6814,7 @@ set-function-name@^2.0.0, set-function-name@^2.0.1:
     functions-have-names "^1.2.3"
     has-property-descriptors "^1.0.0"
 
-sharp@*, sharp@^0.32.6:
+sharp@*, sharp@^0.32.1:
   version "0.32.6"
   resolved "https://registry.npmjs.org/sharp/-/sharp-0.32.6.tgz"
   integrity sha512-KyLTWwgcR9Oe4d9HwCwNM2l7+J0dUQwn/yf7S0EnTtb0eVS4RxO0eUSvxPtzT4F3SY+C4K6fqdv/DO27sJ/v/w==
