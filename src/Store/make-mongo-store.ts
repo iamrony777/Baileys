@@ -55,6 +55,15 @@ export type BaileyesMongoStoreConfig = {
 	chatKey?: Comparable<Chat, string>
 	labelAssociationKey?: Comparable<LabelAssociation, string>
 	logger?: Logger
+	/**
+	 * You can set it to not save chats without messages.
+	 *
+	 * Use this filter to identify unsaved chat types in your current databse.
+	 *
+	 *     {$and: [{ 'messages.message.messageStubType': { $exists: true }},{ 'messages.message.message': { $exists: true }}]}
+	 *
+	 */
+	filterChats?: boolean
 	db: Db
 }
 
@@ -98,7 +107,7 @@ const predefinedLabels = Object.freeze<Record<string, Label>>({
 	},
 })
 
-export default ({ logger: _logger, db }: BaileyesMongoStoreConfig) => {
+export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) => {
 	const logger =
 		_logger || DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
 	const chats = db.collection<Chat>('chats')
@@ -138,21 +147,35 @@ export default ({ logger: _logger, db }: BaileyesMongoStoreConfig) => {
 				contacts: newContacts,
 				messages: newMessages,
 			}) => {
-				const chatsAdded = await chats.bulkWrite(
-					newChats.map((chat) => {
-						return {
-							insertOne: {
-								document: chat,
-							},
+
+				if(filterChats) {
+					newChats = newChats.map((chat) => {
+						if(chat.messages?.some(m => !m.message?.message && m.message?.messageStubType)) {
+						  return undefined
 						}
-					})
-				)
 
-				logger.debug({ chatsAdded: chatsAdded.insertedCount }, 'synced chats')
-
-				if(!chatsAdded.insertedCount) {
-					throw new Error('no chats added')
+						return chat
+					  }).filter(Boolean) as Chat[]
 				}
+
+
+				if(newChats.length) {
+					const chatsAdded = await chats.bulkWrite(
+						newChats.map((chat) => {
+							return {
+								insertOne: {
+									document: chat,
+								},
+							}
+						})
+					)
+
+					logger.debug({ chatsAdded: chatsAdded.insertedCount }, 'synced chats')
+
+				} else {
+					logger.debug('no chats added')
+				}
+
 
 				const oldContacts = await contacts.bulkWrite(
 					newContacts.map((contact) => {
@@ -181,11 +204,10 @@ export default ({ logger: _logger, db }: BaileyesMongoStoreConfig) => {
 						{ id: jid },
 						{ projection: { _id: 0 } }
 					)
+
 					if(chat) {
-						chat.messages
-							? chat.messages.push({ message: msg })
-							: (chat.messages = [{ message: msg }])
-						await chats.updateOne({ id: jid }, { $set: chat }, { upsert: true })
+						chat.messages?.push({ message: msg }) || (chat.messages = [{ message: msg }])
+						await chats.findOneAndUpdate({ id: jid }, { $set: chat }, { upsert: true })
 					} else {
 						logger.debug({ jid }, 'chat not found')
 					}
@@ -228,7 +250,6 @@ export default ({ logger: _logger, db }: BaileyesMongoStoreConfig) => {
 		})
 
 		ev.on('chats.upsert', async(newChats) => {
-			// try {
 			await chats.bulkWrite(
 				newChats.map((chat) => {
 					return {
@@ -437,6 +458,22 @@ export default ({ logger: _logger, db }: BaileyesMongoStoreConfig) => {
 			}
 		})
 	}
+
+	// interface Rule {
+	// 	collection: string
+	// 	filter?: Filter<Document>
+	// 	options?: DeleteOptions
+	// }
+
+	// const cleanup = async ({ rules, interval }: { rules: Rule[], interval: number }) => {
+	// 	await Promise.all(
+	// 		rules.map(async ({ collection, filter, options }) => {
+	// 			logger.debug({ collection, filter, options }, 'purge')
+	// 			// await db.collection(collection).deleteMany(filter, options)
+	// 		})
+	// 	)
+
+	// }
 
 	const toJSON = () => ({
 		chats,

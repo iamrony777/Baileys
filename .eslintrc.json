@@ -4,7 +4,7 @@
         "sourceType": "module",
         "project": "./tsconfig.json"
     },
-    "ignorePatterns": ["src/Tests/*"],
+    "ignorePatterns": ["src/Tests/*", "Example/*"],
     "rules": {
         "@typescript-eslint/no-explicit-any": [
             "warn",
