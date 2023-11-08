@@ -41,7 +41,6 @@
     "lint": "eslint src --ext .js,.ts,.jsx,.tsx",
     "lint:fix": "eslint src --fix --ext .js,.ts,.jsx,.tsx",
     "prepack": "tsc",
-    "postinstall": "tsc",
     "release": "release-it",
     "test": "jest",
     "sentry:sourcemaps": "sentry-cli sourcemaps inject --org rony-wp-bot --project baileys ./lib && sentry-cli sourcemaps upload --org rony-wp-bot --project baileys ./lib"
