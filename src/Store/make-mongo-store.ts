@@ -60,7 +60,11 @@ export type BaileyesMongoStoreConfig = {
 	 *
 	 * Use this filter to identify unsaved chat types in your current databse.
 	 *
-	 *     {$and: [{ 'messages.message.messageStubType': { $exists: true }},{ 'messages.message.message': { $exists: true }}]}
+	 *     	{ $and: [
+	 * 					{ 'messages.message.messageStubType': { $exists: true } },
+	 * 					{ 'messages.message.message': { $exists: true } }
+	 * 				]
+	 * 		}
 	 *
 	 */
 	filterChats?: boolean
@@ -515,6 +519,17 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 		}
 	}
 
+	/**
+	 * Retrieves a chat object by its ID.
+	 *
+	 * @param {string} jid - The ID of the chat.
+	 * @return {Promise<Chat|null>} A promise that resolves to the chat object if found, or null if not found.
+	 */
+	const getChatById = async (jid: string): Promise<Chat|null> => {
+		return await chats.findOne({ id: jid }, { projection: { _id: 0 } })
+	}
+
+
 	return {
 		chats,
 		contacts,
@@ -664,6 +679,7 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 			const msg = list?.get(id!)
 			return msg?.userReceipt
 		},
+		getChatById,
 		toJSON,
 		fromJSON,
 	}
