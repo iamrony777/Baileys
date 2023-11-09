@@ -607,9 +607,20 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 
 			return associations?.map(({ labelId }) => labelId)
 		},
-		loadMessage: async(jid: string, id: string) => messages[jid]?.get(id),
+		loadMessage: async(jid: string, id: string) => {
+			if (messages[jid]) {
+				return messages[jid].get(id)
+			}
+
+			const chat = await chats.findOne({ id: jid }, { projection: { _id: 0 } })
+			for (const m of chat?.messages ?? []) {
+				if (m?.message?.key.id === id) {
+					return m.message
+				}
+			}
+		},
 		mostRecentMessage: async(jid: string) => {
-			const message: WAMessage | undefined = messages[jid]?.array.slice(-1)[0]
+			const message: WAMessage | undefined = messages[jid]?.array.slice(-1)[0] || (await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0].message || undefined
 			return message
 		},
 		fetchImageUrl: async(jid: string, sock: WASocket | undefined) => {

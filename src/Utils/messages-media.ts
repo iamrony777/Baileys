@@ -16,6 +16,7 @@ import { BaileysEventMap, DownloadableMessage, MediaConnInfo, MediaDecryptionKey
 import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildBuffer, jidNormalizedUser } from '../WABinary'
 import { aesDecryptGCM, aesEncryptGCM, hkdf } from './crypto'
 import { generateMessageID } from './generics'
+import axios from 'axios'
 
 const getTmpFilesDirectory = () => tmpdir()
 
@@ -323,11 +324,10 @@ export async function generateThumbnail(
 	}
 }
 
-export const getHttpStream = async(url: string | URL, options: AxiosRequestConfig & { isStream?: true } = {}) => {
-	const { default: axios } = await import('axios')
-	const fetched = await axios.get(url.toString(), { ...options, responseType: 'stream' })
-	return fetched.data as Readable
-}
+export const getHttpStream  = async (url: string|URL, options: AxiosRequestConfig & { isStream?: true } = {}): Promise<Readable> => {
+	const response = await axios.get(typeof url === 'string' ? url : url.toString()	, { ...options, responseType: 'stream' })
+	return response.data
+  }
 
 type EncryptedStreamOptions = {
 	saveOriginalFileIfRequired?: boolean
@@ -633,6 +633,7 @@ export const getWAUploadToServer = (
 					reqBody,
 					{
 						...options,
+						// @ts-ignore
 						headers: {
 							...options.headers || { },
 							'Content-Type': 'application/octet-stream',
