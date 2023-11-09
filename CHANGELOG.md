@@ -1,8 +1,12 @@
+# [6.5.0-4](https://github.com/iamrony777/Baileys/compare/v6.5.0-2...v6.5.0-4) (2023-11-07)
+
+
+
 # [6.5.0-2](https://github.com/iamrony777/Baileys/compare/v6.5.0-1...v6.5.0-2) (2023-11-02)
 
 
 
-# [6.5.0-1](https://github.com/iamrony777/Baileys/compare/v6.5.10...v6.5.0-1) (2023-11-02)
+# [6.5.0-1](https://github.com/iamrony777/Baileys/compare/07291d8ef69c886bd1aefb3b474a8b7553daebad...v6.5.0-1) (2023-11-02)
 
 
 ### Bug Fixes
