@@ -12,10 +12,11 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   getAggregateVotesInPollMessage,
   makeCacheableSignalKeyStore,
-  makeMongoStore,
+  makeMongoStore, // mongo store
   PHONENUMBER_MCC,
   proto,
-  useMongoDBAuthState,
+  useMongoDBAuthState, // mongo auth
+  useRedisAuthState, // redis auth
   WAMessageContent,
   WAMessageKey,
 } from "../src";
@@ -25,6 +26,7 @@ logger.level = "debug";
 
 import * as Sentry from "@sentry/node";
 import { ProfilingIntegration } from "@sentry/profiling-node";
+import { createClient } from "redis";
 
 if (process.env.SENTRY_DSN) {
   logger.info("Sentry enabled");
@@ -79,34 +81,30 @@ const startSock = async () => {
     waitQueueTimeoutMS: 1_00_000,
   });
   await mongoClient.connect();
-  const { state, saveCreds } = await useMongoDBAuthState(
-    mongoClient.db("whatsapp-sessions").collection("client")
-  );
+  // const { state, saveCreds, removeCreds } = await useMongoDBAuthState(
+  //   mongoClient.db("whatsapp-sessions").collection("client")
+  // );
   const store = useStore
     ? makeMongoStore({
         filterChats: true,
         logger,
         db: mongoClient.db("whatsapp-sessions"),
-        // autoDeleteStatusMessage: {
-        //   cronTime: "*/5 * * * *",
+        // autoDeleteStatusMessage: { 
+        //   cronTime: "*/1 * * * *",
         //   timeZone: "Asia/Kolkata",
         // },
         autoDeleteStatusMessage: true
       })
     : undefined;
-  // await store?.readFromDb('store')
-  // setInterval(async() => {
-  // 	await store?.writeToDb('store')
-  // }, 60 * 1000)
 
   // Use Redis to store auth info, and multiauthstore to store other data
-  // const url = new URL(process.env.REDIS_URL!)
-  // const client = createClient({
-  // 	url: url.href,
-  // 	database: url.protocol === 'rediss:' ? 0 : 1,
-  // })
-  // await client.connect()
-  // const { state, saveCreds } = await useRedisAuthState(client, 'store', logger)
+  const url = new URL(process.env.REDIS_URL!)
+  const client = createClient({
+  	url: url.href,
+  	database: url.protocol === 'rediss:' ? 0 : 1,
+  })
+  await client.connect()
+  const { state, saveCreds, removeCreds } = await useRedisAuthState(client)
   // const store = useStore
   // 	? makeRedisStore({ logger, redis: client })
   // 	: undefined
@@ -282,7 +280,8 @@ const startSock = async () => {
             startSock();
           } else {
             console.log("Connection closed. You are logged out.");
-            await mongoClient.db("whatsapp-sessions").dropDatabase();
+            // await mongoClient.db("whatsapp-sessions").dropDatabase(); // delete db,
+            await removeCreds() // delete auth creds, usefull if you're combining mongodb with redis
             startSock();
           }
         }
@@ -329,6 +328,7 @@ const startSock = async () => {
               sock.sendMessage(
                 msg.key.remoteJid!,
                 { react: { text: "👍", key: msg.key, groupingKey: msg.key.id } },
+                // { text: "👍" , groupingKey: msg.key.id },
                 { ephemeralExpiration: 1 * 60 }
               );
             }

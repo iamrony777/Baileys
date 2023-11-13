@@ -15,7 +15,7 @@ messages*.json
 node_modules
 output.csv
 Proxy
-test.ts
+test.*.ts
 TestData
 wa-logs.txt
 yarn.lock
