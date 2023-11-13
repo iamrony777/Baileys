@@ -1,3 +1,7 @@
+# [6.5.0-7](https://github.com/iamrony777/Baileys/compare/v6.5.0-6...v6.5.0-7) (2023-11-13)
+
+
+
 # [6.5.0-6](https://github.com/iamrony777/Baileys/compare/v6.5.0-2...v6.5.0-6) (2023-11-09)
 
 
@@ -135,7 +139,7 @@
 
 
 
-# [6.0.0](https://github.com/iamrony777/Baileys/compare/v3.5.3...v6.0.0) (2023-05-10)
+# [6.0.0](https://github.com/iamrony777/Baileys/compare/07291d8ef69c886bd1aefb3b474a8b7553daebad...v6.0.0) (2023-05-10)
 
 
 ### Bug Fixes
@@ -167,6 +171,7 @@
 * browser version ([fe9a6d0](https://github.com/iamrony777/Baileys/commit/fe9a6d07ae9b14beedae8561f2469358b98aa4d2))
 * BufferJSON failing with empty string ([c00c3da](https://github.com/iamrony777/Baileys/commit/c00c3da313922c20385015314981e2ea571f3123))
 * buttonText should be optional ([ed4f234](https://github.com/iamrony777/Baileys/commit/ed4f234fd82761a68440bebc929dda4ff32271fc))
+* call loadMessages multiple times ([3d34a0e](https://github.com/iamrony777/Baileys/commit/3d34a0e55c5fc8fcbbcabee30828f94d14ebd2e4))
 * catch promise rejection on presence update ([9424d04](https://github.com/iamrony777/Baileys/commit/9424d04f5d716f9a9d305c9771266c9030359cf7))
 * catch unexpected errors on MD ([13b0da0](https://github.com/iamrony777/Baileys/commit/13b0da095478e0fa08922c92e350b95f0481b50b))
 * catch unknown user action ([2696af4](https://github.com/iamrony777/Baileys/commit/2696af4da1fa62639ea60043b3b33837412d9f9b))
@@ -290,6 +295,7 @@
 * possible leak on waitForMessage ([b91a1cb](https://github.com/iamrony777/Baileys/commit/b91a1cbcf30b6170fd1097fc6668f3e0584fb4ed))
 * possible typeerror ([4962070](https://github.com/iamrony777/Baileys/commit/4962070c2943febc5f3a2a039137dc8cd8affad6))
 * possibly more accurate receipts ([4edfc75](https://github.com/iamrony777/Baileys/commit/4edfc7531b7a9c0c64d6d21193dcc2dcd6a1def7))
+* presence event when contact not exists ([eac324b](https://github.com/iamrony777/Baileys/commit/eac324bc1cd234cd19ee803968fe82dd3d219b9c))
 * prevent duplicate frame emit ([21f163d](https://github.com/iamrony777/Baileys/commit/21f163d6cf44a29ee85bf3886410d4349376b240))
 * prevent duplicate receipts on multiple messages recv in stanza ([cff2b14](https://github.com/iamrony777/Baileys/commit/cff2b1427abd010f7fae1ae20b4b18a34b7f5d94))
 * pub key type is buffer ([5a3ef65](https://github.com/iamrony777/Baileys/commit/5a3ef65e50762e763358f54b90b52825a6c0328b))
@@ -334,6 +340,7 @@
 * tsc error for DOM ([bacd046](https://github.com/iamrony777/Baileys/commit/bacd046a4e977c859f6f100cc24aba7bfbeed8fb))
 * tsc error in legacy version ([7b3fd7c](https://github.com/iamrony777/Baileys/commit/7b3fd7c3c531160c343b0de2c0934c5e18c8d505))
 * tsc issue ([070e24e](https://github.com/iamrony777/Baileys/commit/070e24e3fd77a784e925c74334e1f18680b1f993))
+* TypeError caused by empty chat ([07291d8](https://github.com/iamrony777/Baileys/commit/07291d8ef69c886bd1aefb3b474a8b7553daebad))
 * typeerror on no messages provided ([b3e0f26](https://github.com/iamrony777/Baileys/commit/b3e0f26ec025a0b5eaf1c79b1ca8a3560b446268))
 * typeerror on patch ([cea9e9d](https://github.com/iamrony777/Baileys/commit/cea9e9da8a98664f91086af6f6c5fd9967acd323))
 * typeerror on some group create ([49e7ad4](https://github.com/iamrony777/Baileys/commit/49e7ad4b258026c2368e8a61bc76174e190a4bbd))
@@ -544,93 +551,6 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/iamrony777/Baileys/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/iamrony777/Baileys/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/iamrony777/Baileys/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-
-
-
-## [3.5.3](https://github.com/iamrony777/Baileys/compare/v3.5.2...v3.5.3) (2021-11-15)
-
-
-
-## [3.5.2](https://github.com/iamrony777/Baileys/compare/v3.5.1...v3.5.2) (2021-08-09)
-
-
-
-## [3.5.1](https://github.com/iamrony777/Baileys/compare/v3.5.0...v3.5.1) (2021-06-16)
-
-
-
-# [3.5.0](https://github.com/iamrony777/Baileys/compare/v3.4.1...v3.5.0) (2021-03-24)
-
-
-
-## [3.4.1](https://github.com/iamrony777/Baileys/compare/v3.3.2...v3.4.1) (2020-12-31)
-
-
-
-## [3.3.2](https://github.com/iamrony777/Baileys/compare/v3.3.1...v3.3.2) (2020-12-08)
-
-
-
-## [3.3.1](https://github.com/iamrony777/Baileys/compare/v3.3.0...v3.3.1) (2020-11-30)
-
-
-
-# [3.3.0](https://github.com/iamrony777/Baileys/compare/v3.2.4...v3.3.0) (2020-11-17)
-
-
-
-## [3.2.4](https://github.com/iamrony777/Baileys/compare/v3.2.2...v3.2.4) (2020-11-07)
-
-
-
-## [3.2.2](https://github.com/iamrony777/Baileys/compare/v3.2.1...v3.2.2) (2020-10-29)
-
-
-
-## [3.2.1](https://github.com/iamrony777/Baileys/compare/v3.2.0...v3.2.1) (2020-10-23)
-
-
-
-# [3.2.0](https://github.com/iamrony777/Baileys/compare/v3.1.0...v3.2.0) (2020-10-11)
-
-
-### Bug Fixes
-
-* presence event when contact not exists ([eac324b](https://github.com/iamrony777/Baileys/commit/eac324bc1cd234cd19ee803968fe82dd3d219b9c))
-
-
-
-# [3.1.0](https://github.com/iamrony777/Baileys/compare/v3.0.0...v3.1.0) (2020-09-11)
-
-
-### Bug Fixes
-
-* call loadMessages multiple times ([3d34a0e](https://github.com/iamrony777/Baileys/commit/3d34a0e55c5fc8fcbbcabee30828f94d14ebd2e4))
-
-
-
-# [3.0.0](https://github.com/iamrony777/Baileys/compare/2.1.0...v3.0.0) (2020-09-02)
-
-
-### Bug Fixes
-
-* TypeError caused by empty chat ([07291d8](https://github.com/iamrony777/Baileys/commit/07291d8ef69c886bd1aefb3b474a8b7553daebad))
-
-
-
-# [2.1.0](https://github.com/iamrony777/Baileys/compare/1.1.0...2.1.0) (2020-07-08)
-
-
-
-# [1.1.0](https://github.com/iamrony777/Baileys/compare/1.0.2...1.1.0) (2020-06-06)
-
-
-
-## [1.0.2](https://github.com/iamrony777/Baileys/compare/0.9.0...1.0.2) (2020-05-20)
-
-
-
-# 0.9.0 (2020-05-09)
 
 
 
