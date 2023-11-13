@@ -1,5 +1,5 @@
 /**
-	Using Redis to store `auth`,`state`
+	Using Redis to store login data
 	Original Author @kreivc (https://www.kreivc.com/)
 */
 
@@ -17,33 +17,32 @@ import { BufferJSON } from './generics'
 
 export const useRedisAuthState = async(
 	redis: ReturnType<typeof createClient>,
-	suffix = 'store',
+	authKey: string = 'auth',
 	logger?: Logger
 ): Promise<{
 	state: AuthenticationState
 	saveCreds: () => Promise<void>
 	removeCreds: () => Promise<void>
 }> => {
-	const createKey = (key: string, suffix: string) => `${key}:${suffix}`
-	const writeData = async(key: string, field: string, data: any) => {
-		logger?.debug({ key: createKey(key, suffix), field, data }, 'writing data')
-
+	const writeData = async(id: string, data: AuthenticationCreds) => {
+		logger?.debug({ id, data }, 'writing data')
+		
 		await redis.hSet(
-			createKey(key, suffix),
-			field,
+			authKey,
+			id,
 			JSON.stringify(data, BufferJSON.replacer)
 		)
 	}
 
-	const readData = async(key: string, field: string) => {
-		const data = await redis.hGet(createKey(key, suffix), field)
-		logger?.debug({ key: createKey(key, suffix), data }, 'reading data')
+	const readData = async(id: string) => {
+		const data = await redis.hGet(authKey, id)
+		logger?.debug({ id, data }, 'reading data')
 
 		return data ? JSON.parse(data, BufferJSON.reviver) : null
 	}
 
 	const creds: AuthenticationCreds =
-		(await readData('auth', 'creds')) || initAuthCreds()
+		(await readData('creds')) || initAuthCreds()
 
 	return {
 		state: {
@@ -54,7 +53,7 @@ export const useRedisAuthState = async(
 					const data: { [_: string]: SignalDataTypeMap[typeof type] } = {}
 					await Promise.all(
 						ids.map(async(id: string | number) => {
-							let value = await readData('auth', `${type}-${id}`)
+							let value = await readData(`${type}-${id}`)
 							if(type === 'app-state-sync-key' && value) {
 								value = proto.Message.AppStateSyncKeyData.fromObject(value)
 							}
@@ -70,15 +69,15 @@ export const useRedisAuthState = async(
 					for(const category in data) {
 						for(const id in data[category]) {
 							const value = data[category][id]
-							const field = `${category}-${id}`
+							const key = `${category}-${id}`
 							tasks.push(
 								value
 									? redis.hSet(
-										createKey('auth', suffix),
-										field,
+										authKey,
+										key,
 										JSON.stringify(value, BufferJSON.replacer)
 									)
-									: redis.hDel(createKey('auth', suffix), field)
+									: redis.hDel(authKey, key)
 							)
 						}
 					}
@@ -89,11 +88,11 @@ export const useRedisAuthState = async(
 		},
 		saveCreds: async() => {
 			logger?.debug({ creds }, 'saving creds')
-			await writeData('auth', 'creds', creds)
+			await writeData('creds', creds)
 		},
 		removeCreds: async() => {
 			logger?.debug('deleting creds')
-			await redis.del(createKey('auth', suffix))
+			await redis.del(authKey)
 		},
 	}
 }

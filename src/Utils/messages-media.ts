@@ -1,5 +1,6 @@
 import { Boom } from '@hapi/boom'
 import { AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import { exec } from 'child_process'
 import * as Crypto from 'crypto'
 import { once } from 'events'
@@ -16,7 +17,6 @@ import { BaileysEventMap, DownloadableMessage, MediaConnInfo, MediaDecryptionKey
 import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildBuffer, jidNormalizedUser } from '../WABinary'
 import { aesDecryptGCM, aesEncryptGCM, hkdf } from './crypto'
 import { generateMessageID } from './generics'
-import axios from 'axios'
 
 const getTmpFilesDirectory = () => tmpdir()
 
@@ -324,10 +324,10 @@ export async function generateThumbnail(
 	}
 }
 
-export const getHttpStream  = async (url: string|URL, options: AxiosRequestConfig & { isStream?: true } = {}): Promise<Readable> => {
-	const response = await axios.get(typeof url === 'string' ? url : url.toString()	, { ...options, responseType: 'stream' })
+export const getHttpStream = async(url: string|URL, options: AxiosRequestConfig & { isStream?: true } = {}): Promise<Readable> => {
+	const response = await axios.get(typeof url === 'string' ? url : url.toString(), { ...options, responseType: 'stream' })
 	return response.data
-  }
+}
 
 type EncryptedStreamOptions = {
 	saveOriginalFileIfRequired?: boolean

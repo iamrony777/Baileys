@@ -4,7 +4,9 @@
         "sourceType": "module",
         "project": "./tsconfig.json"
     },
-    "ignorePatterns": ["src/Tests/*", "Example/*"],
+    "ignorePatterns": [
+        "src/Tests/*", "Example/*"
+    ],
     "rules": {
         "@typescript-eslint/no-explicit-any": [
             "warn",
@@ -27,6 +29,9 @@
                 "selector": "TSEnumDeclaration",
                 "message": "Don't declare enums, use literals instead"
             }
+        ],
+        "no-constant-binary-expression": [
+            "off"
         ]
     }
 }

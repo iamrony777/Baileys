@@ -1,4 +1,6 @@
 import type { Comparable } from '@adiwajshing/keyed-db/lib/Types'
+import { CronJob } from 'cron'
+import moment from 'moment-timezone'
 import { Db } from 'mongodb'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
@@ -30,15 +32,15 @@ import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
 import { ObjectRepository } from './object-repository'
 
-type WASocket = ReturnType<typeof makeMDSocket>
+type WASocket = ReturnType<typeof makeMDSocket>;
 
 export const waChatKey = (pin: boolean) => ({
 	key: (c: Chat) => (pin ? (c.pinned ? '1' : '0') : '') +
-		(c.archived ? '0' : '1') +
-		(c.conversationTimestamp
-			? c.conversationTimestamp.toString(16).padStart(8, '0')
-			: '') +
-		c.id,
+    (c.archived ? '0' : '1') +
+    (c.conversationTimestamp
+    	? c.conversationTimestamp.toString(16).padStart(8, '0')
+    	: '') +
+    c.id,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 })
 
@@ -50,26 +52,45 @@ export const waLabelAssociationKey: Comparable<LabelAssociation, string> = {
 		: la.chatId + la.messageId + la.labelId,
 	compare: (k1: string, k2: string) => k2.localeCompare(k1),
 }
+export type CronJobConfig = {
+  /**
+   * Create crontab expressions from https://crontab.guru/
+   */
+  cronTime: string | Date
+  /**
+   * Timezone of the cron job
+   * @default "Asia/Calcutta"
+   */
+  timeZone?: string
+  onComplete?: Function
+};
 
 export type BaileyesMongoStoreConfig = {
-	chatKey?: Comparable<Chat, string>
-	labelAssociationKey?: Comparable<LabelAssociation, string>
-	logger?: Logger
-	/**
-	 * You can set it to not save chats without messages.
-	 *
-	 * Use this filter to identify unsaved chat types in your current databse.
-	 *
-	 *     	{ $and: [
-	 * 					{ 'messages.message.messageStubType': { $exists: true } },
-	 * 					{ 'messages.message.message': { $exists: true } }
-	 * 				]
-	 * 		}
-	 *
-	 */
-	filterChats?: boolean
-	db: Db
-}
+  chatKey?: Comparable<Chat, string>
+  labelAssociationKey?: Comparable<LabelAssociation, string>
+  logger?: Logger
+  /**
+   * You can set it to not save chats without messages.
+   *
+   * Use this filter to identify unsaved chat types in your current databse.
+   *
+   *     	{ $and: [
+   * 					{ 'messages.message.messageStubType': { $exists: true } },
+   * 					{ 'messages.message.message': { $exists: true } }
+   * 				]
+   * 		}
+   *
+   */
+  filterChats?: boolean
+  /**
+   * Cron job to delete status message. Set to false to disable
+   *
+   * Deletes all status messages older than 24 hours on At 00:00 (default)
+   * @default config {cronTime: "0 0 * * *", timeZone: "Asia/Calcutta"}
+   */
+  autoDeleteStatusMessage: boolean | CronJobConfig
+  db: Db
+};
 
 const makeMessagesDictionary = () => makeOrderedDictionary(waMessageID)
 
@@ -111,19 +132,105 @@ const predefinedLabels = Object.freeze<Record<string, Label>>({
 	},
 })
 
-export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) => {
+export default ({
+	logger: _logger,
+	db,
+	filterChats,
+	autoDeleteStatusMessage,
+}: BaileyesMongoStoreConfig) => {
+	const isOlderThan24Hours = (timestamp: number): boolean => {
+		const currentTime = moment(new Date()).tz('Asia/Kolkata')
+
+		const hoursDifference = currentTime.diff(
+			moment(timestamp * 1000).tz('Asia/Kolkata'),
+			'hours'
+		)
+		return hoursDifference > 24
+	}
+
+	if(autoDeleteStatusMessage) {
+		if(typeof autoDeleteStatusMessage === 'boolean') {
+			autoDeleteStatusMessage = {
+				cronTime: '0 0 * * *',
+				timeZone: 'Asia/Calcutta',
+			}
+		}
+
+		const update = {
+			$set: {
+				messages: {
+					$filter: {
+						input: '$messages',
+						cond: {
+							$not: {
+								$or: [] as {
+                  $eq: Array<string>
+                }[],
+							},
+						},
+					},
+				},
+			},
+		}
+
+		new CronJob(
+			autoDeleteStatusMessage.cronTime, // cronTime
+			async() => {
+				const statusMesasges = await chats.findOne(
+					{ id: 'status@broadcast' },
+					{ projection: { _id: 0 } }
+				)
+
+				if(statusMesasges) {
+					for(const m of statusMesasges?.messages!) {
+						if(
+							isOlderThan24Hours(
+								typeof m.message?.messageTimestamp === 'number'
+									? m.message?.messageTimestamp
+									: (m.message?.messageTimestamp?.low as number)
+							)
+						) {
+							update.$set.messages.$filter.cond.$not.$or.push({
+								'$eq': ['$$this.message.key.id', m.message?.key.id as string],
+							})
+						}
+					}
+
+					if(update.$set.messages.$filter.cond.$not.$or.length > 0) {
+						const updateResult = await chats.updateOne(
+							{ id: 'status@broadcast' },
+							[update]
+						)
+
+						logger?.debug(updateResult, 'updated statusMessages')
+					}
+
+				}
+
+
+			},
+			() => {
+				logger?.debug('cleared statusMessages')
+			},
+			true, // start
+			autoDeleteStatusMessage?.timeZone
+		)
+	}
+
 	const logger =
-		_logger || DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
+    _logger ||
+    DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'mongo-store' })
 	const chats = db.collection<Chat>('chats')
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } =
-		{}
+    {}
 	const contacts = db.collection<Contact>('contacts')
 	const groupMetadata: { [_: string]: GroupMetadata } = {}
 	const presences: { [id: string]: { [participant: string]: PresenceData } } =
-		{}
+    {}
 	const state: ConnectionState = { connection: 'close' }
 	const labels = new ObjectRepository<Label>(predefinedLabels)
-	const labelAssociations = db.collection<LabelAssociation>('labelAssociations')
+	const labelAssociations =
+    db.collection<LabelAssociation>('labelAssociations')
 
 	const assertMessageList = (jid: string) => {
 		if(!messages[jid]) {
@@ -151,17 +258,21 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 				contacts: newContacts,
 				messages: newMessages,
 			}) => {
-
 				if(filterChats) {
-					newChats = newChats.map((chat) => {
-						if(chat.messages?.some(m => !m.message?.message && m.message?.messageStubType)) {
-						  return undefined
-						}
+					newChats = newChats
+						.map((chat) => {
+							if(
+								chat.messages?.some(
+									(m) => !m.message?.message && m.message?.messageStubType
+								)
+							) {
+								return undefined
+							}
 
-						return chat
-					  }).filter(Boolean) as Chat[]
+							return chat
+						})
+						.filter(Boolean) as Chat[]
 				}
-
 
 				if(newChats.length) {
 					const chatsAdded = await chats.bulkWrite(
@@ -174,12 +285,13 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 						})
 					)
 
-					logger.debug({ chatsAdded: chatsAdded.insertedCount }, 'synced chats')
-
+					logger.debug(
+						{ chatsAdded: chatsAdded.insertedCount },
+						'synced chats'
+					)
 				} else {
 					logger.debug('no chats added')
 				}
-
 
 				const oldContacts = await contacts.bulkWrite(
 					newContacts.map((contact) => {
@@ -210,8 +322,13 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 					)
 
 					if(chat) {
-						chat.messages?.push({ message: msg }) || (chat.messages = [{ message: msg }])
-						await chats.findOneAndUpdate({ id: jid }, { $set: chat }, { upsert: true })
+						chat.messages?.push({ message: msg }) ||
+              (chat.messages = [{ message: msg }])
+						await chats.findOneAndUpdate(
+							{ id: jid },
+							{ $set: chat },
+							{ upsert: true }
+						)
 					} else {
 						logger.debug({ jid }, 'chat not found')
 					}
@@ -406,7 +523,10 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 				if(groupMetadata[id]) {
 					Object.assign(groupMetadata[id], update)
 				} else {
-					logger.debug({ update }, 'got update for non-existant group metadata')
+					logger.debug(
+						{ update },
+						'got update for non-existant group metadata'
+					)
 				}
 			}
 		})
@@ -463,22 +583,6 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 		})
 	}
 
-	// interface Rule {
-	// 	collection: string
-	// 	filter?: Filter<Document>
-	// 	options?: DeleteOptions
-	// }
-
-	// const cleanup = async ({ rules, interval }: { rules: Rule[], interval: number }) => {
-	// 	await Promise.all(
-	// 		rules.map(async ({ collection, filter, options }) => {
-	// 			logger.debug({ collection, filter, options }, 'purge')
-	// 			// await db.collection(collection).deleteMany(filter, options)
-	// 		})
-	// 	)
-
-	// }
-
 	const toJSON = () => ({
 		chats,
 		contacts,
@@ -489,12 +593,12 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 
 	// TODO: replace upsert logic by corresponding mongodb collection methods
 	const fromJSON = async(json: {
-		chats: Chat[]
-		contacts: { [id: string]: Contact }
-		messages: { [id: string]: WAMessage[] }
-		labels: { [labelId: string]: Label }
-		labelAssociations: LabelAssociation[]
-	}) => {
+    chats: Chat[]
+    contacts: { [id: string]: Contact }
+    messages: { [id: string]: WAMessage[] }
+    labels: { [labelId: string]: Label }
+    labelAssociations: LabelAssociation[]
+  }) => {
 		await chats.updateMany({}, { $set: { ...json.chats } }, { upsert: true })
 		await labelAssociations.updateMany(
 			{},
@@ -520,15 +624,14 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 	}
 
 	/**
-	 * Retrieves a chat object by its ID.
-	 *
-	 * @param {string} jid - The ID of the chat.
-	 * @return {Promise<Chat|null>} A promise that resolves to the chat object if found, or null if not found.
-	 */
-	const getChatById = async (jid: string): Promise<Chat|null> => {
+   * Retrieves a chat object by its ID.
+   *
+   * @param {string} jid - The ID of the chat.
+   * @return {Promise<Chat|null>} A promise that resolves to the chat object if found, or null if not found.
+   */
+	const getChatById = async(jid: string): Promise<Chat | null> => {
 		return await chats.findOne({ id: jid }, { projection: { _id: 0 } })
 	}
-
 
 	return {
 		chats,
@@ -558,7 +661,9 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 			let messages: WAMessage[]
 			if(list && mode === 'before' && (!cursorKey || cursorValue)) {
 				if(cursorValue) {
-					const msgIdx = list.array.findIndex((m) => m.key.id === cursorKey?.id)
+					const msgIdx = list.array.findIndex(
+						(m) => m.key.id === cursorKey?.id
+					)
 					messages = list.array.slice(0, msgIdx)
 				} else {
 					messages = list.array
@@ -575,20 +680,20 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 			return messages
 		},
 		/**
-		 * Get all available labels for profile
-		 *
-		 * Keep in mind that the list is formed from predefined tags and tags
-		 * that were "caught" during their editing.
-		 */
+     * Get all available labels for profile
+     *
+     * Keep in mind that the list is formed from predefined tags and tags
+     * that were "caught" during their editing.
+     */
 		getLabels: () => {
 			return labels
 		},
 
 		/**
-		 * Get labels for chat
-		 *
-		 * @returns Label IDs
-		 **/
+     * Get labels for chat
+     *
+     * @returns Label IDs
+     **/
 		getChatLabels: (chatId: string) => {
 			return labelAssociations.findOne(
 				(la: { chatId: string }) => la.chatId === chatId
@@ -596,10 +701,10 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 		},
 
 		/**
-		 * Get labels for message
-		 *
-		 * @returns Label IDs
-		 **/
+     * Get labels for message
+     *
+     * @returns Label IDs
+     **/
 		getMessageLabels: async(messageId: string) => {
 			const associations = labelAssociations.find(
 				(la: MessageLabelAssociation) => la.messageId === messageId
@@ -608,19 +713,24 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 			return associations?.map(({ labelId }) => labelId)
 		},
 		loadMessage: async(jid: string, id: string) => {
-			if (messages[jid]) {
+			if(messages[jid]) {
 				return messages[jid].get(id)
 			}
 
 			const chat = await chats.findOne({ id: jid }, { projection: { _id: 0 } })
-			for (const m of chat?.messages ?? []) {
-				if (m?.message?.key.id === id) {
+			for(const m of chat?.messages ?? []) {
+				if(m?.message?.key.id === id) {
 					return m.message
 				}
 			}
 		},
 		mostRecentMessage: async(jid: string) => {
-			const message: WAMessage | undefined = messages[jid]?.array.slice(-1)[0] || (await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0].message || undefined
+			const message: WAMessage | undefined =
+        messages[jid]?.array.slice(-1)[0] ||
+        (
+        	await chats.findOne({ id: jid }, { projection: { _id: 0 } })
+        )?.messages?.slice(-1)[0].message ||
+        undefined
 			return message
 		},
 		fetchImageUrl: async(jid: string, sock: WASocket | undefined) => {
@@ -662,7 +772,7 @@ export default ({ logger: _logger, db, filterChats }: BaileyesMongoStoreConfig) 
 			// fetch image if required
 			if(
 				typeof contact.imgUrl === 'undefined' ||
-				contact.imgUrl === 'changed'
+        contact.imgUrl === 'changed'
 			) {
 				contact.imgUrl = await socket?.profilePictureUrl(contact.id!, 'image')
 				await contacts.updateOne(

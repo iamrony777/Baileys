@@ -1,4 +1,4 @@
-import type { Collection, Condition, Document, ObjectId } from 'mongodb'
+import type { Collection } from 'mongodb'
 import type { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import {
@@ -10,44 +10,33 @@ import { initAuthCreds } from './auth-utils'
 import { BufferJSON } from './generics'
 
 export const useMongoDBAuthState = async(
-	collection: Collection<Document>,
+	collection: Collection<{ id: string } & any>,
 	logger?: Logger
-): Promise<{ state: AuthenticationState, saveCreds: () => Promise<void> }> => {
-	const writeData = async(data: any, id: string) => {
-		logger?.debug({ id, data }, 'writing data')
+): Promise<{ state: AuthenticationState, saveCreds: () => Promise<void>, removeCreds: () => Promise<void> }> => {
+	const writeData = async(id: string, data: AuthenticationCreds) => {
+		logger?.debug({ id }, 'writing data')
 
 		await collection.replaceOne(
-			{ _id: id as unknown as Condition<ObjectId> },
-			JSON.parse(JSON.stringify({ data: data }, BufferJSON.replacer)),
+			{ id },
+			{ id, ...JSON.parse(JSON.stringify(data, BufferJSON.replacer)) }, // complete replace instead of partial
 			{ upsert: true }
 		)
 	}
 
-	const readData = async(id: string) => {
+	const readData = async(id: string): Promise<any | null> => {
 		logger?.debug({ id }, 'reading data')
 
-		try {
-			const data = JSON.stringify(
-				(
-					await collection.findOne({
-						_id: id as unknown as Condition<ObjectId>,
-					})
-				)?.data
-			)
+		const data = await collection.findOne(
+			{ id },
+			{ projection: { _id: 0, id: 0 } }
+		)
 
-			logger?.debug('data', data)
-			return JSON.parse(data, BufferJSON.reviver)
-		} catch(error) {
-			return null
-		}
+		return data ? JSON.parse(JSON.stringify(data), BufferJSON.reviver) : null
 	}
 
 	const removeData = async(id: string) => {
 		logger?.debug({ id }, 'removing data')
-
-		try {
-			await collection.deleteOne({ _id: id as unknown as Condition<ObjectId> })
-		} catch(_a) {}
+		await collection.deleteOne({ id })
 	}
 
 	const creds: AuthenticationCreds =
@@ -77,10 +66,8 @@ export const useMongoDBAuthState = async(
 					for(const category in data) {
 						for(const id in data[category]) {
 							const value = data[category][id]
-							const collection = `${category}-${id}`
-							tasks.push(
-								value ? writeData(value, collection) : removeData(collection)
-							)
+							const key = `${category}-${id}`
+							tasks.push(value ? writeData(key, value) : removeData(key))
 						}
 					}
 
@@ -90,7 +77,12 @@ export const useMongoDBAuthState = async(
 		},
 		saveCreds: async() => {
 			logger?.debug({ creds }, 'saving creds')
-			writeData(creds, 'creds')
+			await writeData('creds', creds)
 		},
+
+		removeCreds: async() => {
+			logger?.debug({ creds }, 'removing creds')
+			await removeData('creds')
+		}
 	}
 }
