@@ -6,6 +6,8 @@ git:
 hooks:
   after:bump:
     - "npm run changelog:update"
+    - rm -rf lib
+    - "npm publish"
 
 # automatic publish from github workflow
 npm:
