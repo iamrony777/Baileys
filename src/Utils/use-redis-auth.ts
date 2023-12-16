@@ -1,6 +1,6 @@
 /**
 	Using Redis to store login data
-	Original Author @kreivc (https://www.kreivc.com/)
+	Modified from @kreivc (https://www.kreivc.com/)
 */
 
 import type { Logger } from 'pino'
@@ -17,16 +17,16 @@ import { BufferJSON } from './generics'
 
 export const useRedisAuthState = async(
 	redis: ReturnType<typeof createClient>,
-	authKey: string = 'auth',
+	authKey = 'auth',
 	logger?: Logger
 ): Promise<{
 	state: AuthenticationState
 	saveCreds: () => Promise<void>
 	removeCreds: () => Promise<void>
 }> => {
-	const writeData = async(id: string, data: AuthenticationCreds) => {
+	const writeData = async(id: string, data: AuthenticationCreds & any) => {
 		logger?.debug({ id, data }, 'writing data')
-		
+
 		await redis.hSet(
 			authKey,
 			id,
@@ -63,19 +63,18 @@ export const useRedisAuthState = async(
 					)
 					return data
 				},
-				set: async(data: any) => {
+				set: async(data) => {
 					logger?.debug({ data }, 'setting data')
-					const tasks: Promise<number>[] = []
+					const tasks: Promise<void|number>[] = []
 					for(const category in data) {
 						for(const id in data[category]) {
 							const value = data[category][id]
 							const key = `${category}-${id}`
 							tasks.push(
 								value
-									? redis.hSet(
-										authKey,
+									? writeData(
 										key,
-										JSON.stringify(value, BufferJSON.replacer)
+										value
 									)
 									: redis.hDel(authKey, key)
 							)

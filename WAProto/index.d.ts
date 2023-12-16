@@ -16835,7 +16835,9 @@ export namespace proto {
             /** PinInChatMessage key */
             key?: (proto.IMessageKey|null);
 
-            /** PinInChatMessage type */
+            /** 
+             * Pin/Unpin = 1/2
+             */
             type?: (proto.Message.PinInChatMessage.Type|null);
 
             /** PinInChatMessage senderTimestampMs */

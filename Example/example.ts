@@ -20,6 +20,7 @@ import makeWASocket, {
   WAMessageContent,
   WAMessageKey,
 } from "../src";
+import { makeLibSignalRepository } from "../src/Signal/libsignal";
 import MAIN_LOGGER from "../src/Utils/logger";
 const logger = MAIN_LOGGER.child({});
 logger.level = "debug";
@@ -89,22 +90,22 @@ const startSock = async () => {
         filterChats: true,
         logger,
         db: mongoClient.db("whatsapp-sessions"),
-        // autoDeleteStatusMessage: { 
+        // autoDeleteStatusMessage: {
         //   cronTime: "*/1 * * * *",
         //   timeZone: "Asia/Kolkata",
         // },
-        autoDeleteStatusMessage: true
+        autoDeleteStatusMessage: true,
       })
     : undefined;
 
   // Use Redis to store auth info, and multiauthstore to store other data
-  const url = new URL(process.env.REDIS_URL!)
+  const url = new URL(process.env.REDIS_URL!);
   const client = createClient({
-  	url: url.href,
-  	database: url.protocol === 'rediss:' ? 0 : 1,
-  })
-  await client.connect()
-  const { state, saveCreds, removeCreds } = await useRedisAuthState(client)
+    url: url.href,
+    database: url.protocol === "rediss:" ? 0 : 1,
+  });
+  await client.connect();
+  const { state, saveCreds, removeCreds } = await useRedisAuthState(client);
   // const store = useStore
   // 	? makeRedisStore({ logger, redis: client })
   // 	: undefined
@@ -126,6 +127,7 @@ const startSock = async () => {
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     msgRetryCounterCache,
+    markOnlineOnConnect: false,
     generateHighQualityLinkPreview: true,
     // ignore all broadcast messages -- to receive the same
     // comment the line below out
@@ -134,6 +136,13 @@ const startSock = async () => {
     shouldSyncHistoryMessage: () => true,
     syncFullHistory: false,
     getMessage,
+    // makeSignalRepository: () => {
+    // 	return makeLibSignalRepository({
+    // 		creds: state.creds,
+    // 		/** caching makes the store faster to send/recv messages */
+    // 		keys: makeCacheableSignalKeyStore(state.keys, logger),
+    // 	})
+    // },
   });
 
   store?.bind(sock.ev);
@@ -281,7 +290,7 @@ const startSock = async () => {
           } else {
             console.log("Connection closed. You are logged out.");
             // await mongoClient.db("whatsapp-sessions").dropDatabase(); // delete db,
-            await removeCreds() // delete auth creds, usefull if you're combining mongodb with redis
+            await removeCreds(); // delete auth creds, usefull if you're combining mongodb with redis
             startSock();
           }
         }
@@ -322,14 +331,24 @@ const startSock = async () => {
 
         if (upsert.type === "notify") {
           for (const msg of upsert.messages) {
-            if (/* msg.key.fromMe */ msg.pushName === 'RONY' && doReplies) {
+            if (/* msg.key.fromMe */ msg.pushName === "RONY" && doReplies) {
               console.log("replying to", msg.key.remoteJid);
               // await sock.readMessages([msg.key]);
+
               sock.sendMessage(
                 msg.key.remoteJid!,
-                { react: { text: "👍", key: msg.key, groupingKey: msg.key.id } },
+                {
+                  pinMessage: {
+                    pinInChatMessage: {
+                      key: msg.key,
+                      type: 1,
+                      senderTimestampMs: msg.messageTimestamp,
+                    },
+                    duration: 640800,
+                  },
+                }
                 // { text: "👍" , groupingKey: msg.key.id },
-                { ephemeralExpiration: 1 * 60 }
+                // { ephemeralExpiration: 1 * 60 }
               );
             }
           }
