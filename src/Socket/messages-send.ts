@@ -645,9 +645,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		sendReceipts,
 		getButtonArgs,
 		readMessages,
-		getButtonArgs,
 		refreshMediaConn,
-	    	waUploadToServer,
+		waUploadToServer,
 		fetchPrivacySettings,
 		updateMediaMessage: async(message: proto.IWebMessageInfo) => {
 			const content = assertMediaContent(message.message)

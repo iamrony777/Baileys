@@ -1,3 +1,12 @@
+# [6.5.0-9](https://github.com/iamrony777/Baileys/compare/v6.5.0-8...v6.5.0-9) (2023-12-22)
+
+
+### Bug Fixes
+
+* Fix linting ([cbffb29](https://github.com/iamrony777/Baileys/commit/cbffb2941cd7e61142a25ef9e58149230621db36))
+
+
+
 # [6.5.0-8](https://github.com/iamrony777/Baileys/compare/v6.5.0-7...v6.5.0-8) (2023-12-16)
 
 
