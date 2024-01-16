@@ -661,7 +661,7 @@ export const generateWAMessage = async(
 export const getContentType = (content: WAProto.IMessage | undefined) => {
 	if(content) {
 		const keys = Object.keys(content)
-		const key = keys.find(k => (k === 'conversation' || k.endsWith('Message')) && k !== 'senderKeyDistributionMessage')
+		const key = keys.find(k => (k === 'conversation' || k.includes('Message')) && k !== 'senderKeyDistributionMessage')
 		return key as keyof typeof content
 	}
 }
@@ -750,7 +750,6 @@ export const extractMessageContent = (content: WAMessageContent | undefined | nu
  * https://github.com/WhiskeySockets/Baileys/pull/451
  */
 export const getDevice = (id: string) => /^3A/.test(id) ? 'ios' : /^3E/.test(id) ? 'web' : /^.{21}/.test(id) ? 'android' : /^.{18}/.test(id) ? 'desktop' : 'unknown'
-
 
 /** Upserts a receipt in the message */
 export const updateMessageWithReceipt = (msg: Pick<WAMessage, 'userReceipt'>, receipt: MessageUserReceipt) => {

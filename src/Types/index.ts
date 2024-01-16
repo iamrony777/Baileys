@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 export * from './Auth'
 export * from './GroupMetadata'
 export * from './Chat'
@@ -23,8 +24,9 @@ export enum DisconnectReason {
 	loggedOut = 401,
     badSession = 500,
     restartRequired = 515,
-    multideviceMismatch = 411
-}
+    multideviceMismatch = 411,
+    forbidden = 403,
+    unavailableService = 503}
 
 export type WAInitResponse = {
     ref: string

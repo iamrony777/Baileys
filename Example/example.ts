@@ -337,18 +337,9 @@ const startSock = async () => {
 
               sock.sendMessage(
                 msg.key.remoteJid!,
-                {
-                  pinMessage: {
-                    pinInChatMessage: {
-                      key: msg.key,
-                      type: 1,
-                      senderTimestampMs: msg.messageTimestamp,
-                    },
-                    duration: 640800,
-                  },
-                }
-                // { text: "👍" , groupingKey: msg.key.id },
-                // { ephemeralExpiration: 1 * 60 }
+                // Send reaction
+                { text: "👍" },
+                { ephemeralExpiration: 1 * 60 }
               );
             }
           }
