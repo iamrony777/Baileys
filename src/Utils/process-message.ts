@@ -1,5 +1,6 @@
 import { AxiosRequestConfig } from 'axios'
 import type { Logger } from 'pino'
+import { Long } from 'protobufjs'
 import { proto } from '../../WAProto'
 import { AuthenticationCreds, BaileysEventEmitter, Chat, GroupMetadata, ParticipantAction, SignalKeyStoreWithTransaction, SocketConfig, WAMessageStubType } from '../Types'
 import { getContentType, normalizeMessageContent } from '../Utils/messages'
@@ -386,7 +387,7 @@ const processMessage = async(
 								{
 									pollUpdateMessageKey: message.key,
 									vote: voteMsg,
-									senderTimestampMs: (content.pollUpdateMessage.senderTimestampMs! as Long).toNumber(),
+									senderTimestampMs: (content.pollUpdateMessage.senderTimestampMs! as Long).low,
 								}
 							]
 						}

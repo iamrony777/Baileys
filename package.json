@@ -1,6 +1,6 @@
 {
   "name": "@iamrony777/baileys",
-  "version": "6.6.0",
+  "version": "6.5.0-10",
   "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
@@ -50,7 +50,7 @@
     "@hapi/boom": "^10.0.1",
     "audio-decode": "^2.1.5",
     "axios": "^1.6.1",
-    "cache-manager": "^5.2.4",
+    "cache-manager": "4.0.1",
     "cron": "^3.1.6",
     "dotenv": "^16.3.1",
     "futoin-hkdf": "^1.5.3",
