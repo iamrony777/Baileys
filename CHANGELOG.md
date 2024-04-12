@@ -564,6 +564,7 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/iamrony777/Baileys/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/iamrony777/Baileys/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/iamrony777/Baileys/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
+# 6.6.0 (2024-01-19)
 
 
 
