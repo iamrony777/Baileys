@@ -1,3 +1,29 @@
+# [6.6.0](https://github.com/iamrony777/Baileys/compare/v6.5.0-10...v6.6.0) (2024-04-12)
+
+
+### Bug Fixes
+
+* **#681:** Fixed import (credit to [#611](https://github.com/iamrony777/Baileys/issues/611)) ([c218f37](https://github.com/iamrony777/Baileys/commit/c218f3746e18ff75d552e130ccf01f30280e1e16))
+* find platform type based on browser second argument ([32533ed](https://github.com/iamrony777/Baileys/commit/32533ed7f6ebbd8bd70a0a871c43ee0b579b8ce8)), closes [#481](https://github.com/iamrony777/Baileys/issues/481) [#228](https://github.com/iamrony777/Baileys/issues/228)
+* fix message content type detection ([a07922b](https://github.com/iamrony777/Baileys/commit/a07922b136e84d99f036b7d51bfe1cead8236368))
+* fix pairing code ([abe4256](https://github.com/iamrony777/Baileys/commit/abe42564bed1d2f34014ef580d249a644142bdc2))
+* **missing-messages:** linting and bug ([c264633](https://github.com/iamrony777/Baileys/commit/c264633291b16ffd897e9a98d29d3bf6a11502ff))
+* **missing-messages:** linting fix ([9d3dcfd](https://github.com/iamrony777/Baileys/commit/9d3dcfd08b161983f2b7654eaccbf93f2362b442))
+* quick test to diagnose working dir issue ([b5e5239](https://github.com/iamrony777/Baileys/commit/b5e5239c94b838e72a2e0f5fa6c613a4306ba66f))
+* **retry:** final commit: linting ([767af0b](https://github.com/iamrony777/Baileys/commit/767af0b688a21a5737ef745997f8687870dc1294))
+
+
+### Features
+
+* Add max msg retry count ([#572](https://github.com/iamrony777/Baileys/issues/572)) ([18990f8](https://github.com/iamrony777/Baileys/commit/18990f874f9faf2423c9f6a024bfc7d72f8b4c9e))
+* add option for Windows browser ([#303](https://github.com/iamrony777/Baileys/issues/303)) ([3fc5d4b](https://github.com/iamrony777/Baileys/commit/3fc5d4b8036cc72e672e646399bcf9f6bd72ccc9))
+* auto version hash ([#290](https://github.com/iamrony777/Baileys/issues/290)) ([6b4d917](https://github.com/iamrony777/Baileys/commit/6b4d91737f375070ae4869b7ec43d7728d48d2ee))
+* If need approval to join the group in groupMetadata ([#533](https://github.com/iamrony777/Baileys/issues/533)) ([c41be3a](https://github.com/iamrony777/Baileys/commit/c41be3ac4fd90bf1ce748b7905e74600cef8a1d1))
+* memberAddMode and joinApprovalMode in groups.update ([#532](https://github.com/iamrony777/Baileys/issues/532)) ([3efd3e0](https://github.com/iamrony777/Baileys/commit/3efd3e00ca64b795a6e1f7581aaf260880a09202))
+* Set in group settings memberAddMode and joinApprovalMode ([#534](https://github.com/iamrony777/Baileys/issues/534)) ([408c007](https://github.com/iamrony777/Baileys/commit/408c0070ba85d33a05cfeab66f447464b2bbf36f))
+
+
+
 # [6.5.0-10](https://github.com/iamrony777/Baileys/compare/v6.5.0-8...v6.5.0-10) (2024-01-16)
 
 
@@ -564,7 +590,6 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/iamrony777/Baileys/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/iamrony777/Baileys/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/iamrony777/Baileys/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-# 6.6.0 (2024-01-19)
 
 
 
