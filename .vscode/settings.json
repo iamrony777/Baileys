@@ -10,7 +10,7 @@
     "javascript.inlayHints.enumMemberValues.enabled": true,
     "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
     "[typescript]": {
-        "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
     },
     "editor.formatOnPaste": false, // required
     "editor.formatOnType": false, // required

@@ -5,20 +5,22 @@ import NodeCache from "node-cache";
 import readline from "readline";
 import "dotenv/config";
 import makeWASocket, {
-  AnyMessageContent,
-  Browsers,
-  delay,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  getAggregateVotesInPollMessage,
-  makeCacheableSignalKeyStore,
-  makeMongoStore, // mongo store
-  PHONENUMBER_MCC,
-  proto,
-  useMongoDBAuthState, // mongo auth
-  useRedisAuthState, // redis auth
-  WAMessageContent,
-  WAMessageKey,
+	AnyMessageContent,
+	BinaryInfo,
+	Browsers,
+	delay,
+	DisconnectReason,
+	encodeWAM,
+	fetchLatestBaileysVersion,
+	getAggregateVotesInPollMessage,
+	makeCacheableSignalKeyStore,
+	makeMongoStore, // mongo store
+	PHONENUMBER_MCC,
+	proto,
+	useMongoDBAuthState, // mongo auth
+	useRedisAuthState, // redis auth
+	WAMessageContent,
+	WAMessageKey,
 } from "../src";
 import { makeLibSignalRepository } from "../src/Signal/libsignal";
 import MAIN_LOGGER from "../src/Utils/logger";
@@ -30,15 +32,15 @@ import { ProfilingIntegration } from "@sentry/profiling-node";
 import { createClient } from "redis";
 
 if (process.env.SENTRY_DSN) {
-  logger.info("Sentry enabled");
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    integrations: [new ProfilingIntegration()],
-    // Performance Monitoring
-    tracesSampleRate: 1.0,
-    // Set sampling rate for profiling - this is relative to tracesSampleRate
-    profilesSampleRate: 1.0,
-  });
+	logger.info("Sentry enabled");
+	Sentry.init({
+		dsn: process.env.SENTRY_DSN,
+		integrations: [new ProfilingIntegration()],
+		// Performance Monitoring
+		tracesSampleRate: 1.0,
+		// Set sampling rate for profiling - this is relative to tracesSampleRate
+		profilesSampleRate: 1.0,
+	});
 }
 
 const useStore = !process.argv.includes("--no-store");
@@ -52,11 +54,11 @@ const msgRetryCounterCache = new NodeCache();
 
 // Read line interface
 const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
+	input: process.stdin,
+	output: process.stdout,
 });
 const question = (text: string) =>
-  new Promise<string>((resolve) => rl.question(text, resolve));
+	new Promise<string>((resolve) => rl.question(text, resolve));
 
 // the store maintains the data of the WA connection in memory
 // can be written out to a file & read from it
@@ -70,352 +72,394 @@ const question = (text: string) =>
 // start a connection
 
 const startSock = async () => {
-  // const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
-  // fetch latest version of WA Web
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
+	// const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info')
+	// fetch latest version of WA Web
+	const { version, isLatest } = await fetchLatestBaileysVersion();
+	console.log(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
+	// // Use mongodb to store auth info
+	const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
+		socketTimeoutMS: 1_00_000,
+		connectTimeoutMS: 1_00_000,
+		waitQueueTimeoutMS: 1_00_000,
+	});
+	await mongoClient.connect();
+	// const { state, saveCreds, removeCreds } = await useMongoDBAuthState(
+	//   mongoClient.db("whatsapp-sessions").collection("client")
+	// );
+	const store = useStore
+		? makeMongoStore({
+				filterChats: true,
+				logger,
+				db: mongoClient.db("whatsapp-sessions"),
+				// autoDeleteStatusMessage: {
+				//   cronTime: "*/1 * * * *",
+				//   timeZone: "Asia/Kolkata",
+				// },
+				autoDeleteStatusMessage: true,
+		  })
+		: undefined;
+	// Use Redis to store auth info, and multiauthstore to store other data
+	const url = new URL(process.env.REDIS_URL!);
+	const client = createClient({
+		url: url.href,
+		database: url.protocol === "rediss:" ? 0 : 1,
+	});
+	await client.connect();
+	const { state, saveCreds, removeCreds } = await useRedisAuthState(client);
+	// const store = useStore
+	// 	? makeRedisStore({ logger, redis: client })
+	// 	: undefined
+	// await store?.readFromDb()
+	// setInterval(async() => {
+	// 	await store?.uploadToDb()
+	// }, 60 * 1000)
 
-  // // Use mongodb to store auth info
-  const mongoClient = new MongoClient(process.env.MONGODB_URL as string, {
-    socketTimeoutMS: 1_00_000,
-    connectTimeoutMS: 1_00_000,
-    waitQueueTimeoutMS: 1_00_000,
-  });
-  await mongoClient.connect();
-  // const { state, saveCreds, removeCreds } = await useMongoDBAuthState(
-  //   mongoClient.db("whatsapp-sessions").collection("client")
-  // );
-  const store = useStore
-    ? makeMongoStore({
-        filterChats: true,
-        logger,
-        db: mongoClient.db("whatsapp-sessions"),
-        // autoDeleteStatusMessage: {
-        //   cronTime: "*/1 * * * *",
-        //   timeZone: "Asia/Kolkata",
-        // },
-        autoDeleteStatusMessage: true,
-      })
-    : undefined;
+	async function getMessage(
+		key: WAMessageKey
+	): Promise<WAMessageContent | undefined> {
+		if (store) {
+			const msg = await store.loadMessage(key.remoteJid!, key.id!);
+			return msg?.message || undefined;
+		}
 
-  // Use Redis to store auth info, and multiauthstore to store other data
-  const url = new URL(process.env.REDIS_URL!);
-  const client = createClient({
-    url: url.href,
-    database: url.protocol === "rediss:" ? 0 : 1,
-  });
-  await client.connect();
-  const { state, saveCreds, removeCreds } = await useRedisAuthState(client);
-  // const store = useStore
-  // 	? makeRedisStore({ logger, redis: client })
-  // 	: undefined
-  // await store?.readFromDb()
-  // setInterval(async() => {
-  // 	await store?.uploadToDb()
-  // }, 60 * 1000)
+		// only if store is present
+		return proto.Message.fromObject({});
+	}
+	const sock = makeWASocket({
+		version,
+		defaultQueryTimeoutMs: undefined,
+		logger,
+		browser: Browsers.baileys("desktop"),
+		printQRInTerminal: !usePairingCode,
+		mobile: useMobile,
+		auth: {
+			creds: state.creds,
+			/** caching makes the store faster to send/recv messages */
+			keys: makeCacheableSignalKeyStore(state.keys, logger),
+		},
+		msgRetryCounterCache,
+		markOnlineOnConnect: false,
+		generateHighQualityLinkPreview: true,
+		// ignore all broadcast messages -- to receive the same
+		// comment the line below out
+		// shouldIgnoreJid: jid => isJidBroadcast(jid),
+		// implement to handle retries & poll updates
+		shouldSyncHistoryMessage: () => true,
+		syncFullHistory: false,
+		getMessage,
+		// makeSignalRepository: () => {
+		// 	return makeLibSignalRepository({
+		// 		creds: state.creds,
+		// 		/** caching makes the store faster to send/recv messages */
+		// 		keys: makeCacheableSignalKeyStore(state.keys, logger),
+		// 	})
+		// },
+	});
+	store?.bind(sock.ev);
 
-  const sock = makeWASocket({
-    version,
-    defaultQueryTimeoutMs: undefined,
-    logger,
-    browser: Browsers.baileys("desktop"),
-    printQRInTerminal: !usePairingCode,
-    mobile: useMobile,
-    auth: {
-      creds: state.creds,
-      /** caching makes the store faster to send/recv messages */
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
-    },
-    msgRetryCounterCache,
-    markOnlineOnConnect: false,
-    generateHighQualityLinkPreview: true,
-    // ignore all broadcast messages -- to receive the same
-    // comment the line below out
-    // shouldIgnoreJid: jid => isJidBroadcast(jid),
-    // implement to handle retries & poll updates
-    shouldSyncHistoryMessage: () => true,
-    syncFullHistory: false,
-    getMessage,
-    // makeSignalRepository: () => {
-    // 	return makeLibSignalRepository({
-    // 		creds: state.creds,
-    // 		/** caching makes the store faster to send/recv messages */
-    // 		keys: makeCacheableSignalKeyStore(state.keys, logger),
-    // 	})
-    // },
-  });
+	// Pairing code for Web clients
+	if (usePairingCode && !sock.authState.creds.registered) {
+		if (useMobile) {
+			throw new Error("Cannot use pairing code with mobile api");
+		}
 
-  store?.bind(sock.ev);
+		const phoneNumber = await question(
+			"Please enter your mobile phone number:\n"
+		);
+		const code = await sock.requestPairingCode(phoneNumber);
+		console.log(`Pairing code: ${code}`);
+	}
 
-  // Pairing code for Web clients
-  if (usePairingCode && !sock.authState.creds.registered) {
-    if (useMobile) {
-      throw new Error("Cannot use pairing code with mobile api");
-    }
+	// If mobile was chosen, ask for the code
+	if (useMobile && !sock.authState.creds.registered) {
+		const { registration } = sock.authState.creds || { registration: {} };
 
-    const phoneNumber = await question(
-      "Please enter your mobile phone number:\n"
-    );
-    const code = await sock.requestPairingCode(phoneNumber);
-    console.log(`Pairing code: ${code}`);
-  }
+		if (!registration.phoneNumber) {
+			registration.phoneNumber = await question(
+				"Please enter your mobile phone number:\n"
+			);
+		}
 
-  // If mobile was chosen, ask for the code
-  if (useMobile && !sock.authState.creds.registered) {
-    const { registration } = sock.authState.creds || { registration: {} };
+		const libPhonenumber = await import("libphonenumber-js");
+		const phoneNumber = libPhonenumber.parsePhoneNumber(
+			registration.phoneNumber
+		);
+		if (!phoneNumber?.isValid()) {
+			throw new Error("Invalid phone number: " + registration.phoneNumber);
+		}
 
-    if (!registration.phoneNumber) {
-      registration.phoneNumber = await question(
-        "Please enter your mobile phone number:\n"
-      );
-    }
+		registration.phoneNumber = phoneNumber.format("E.164");
+		registration.phoneNumberCountryCode = phoneNumber.countryCallingCode;
+		registration.phoneNumberNationalNumber = phoneNumber.nationalNumber;
+		const mcc = PHONENUMBER_MCC[phoneNumber.countryCallingCode];
+		if (!mcc) {
+			throw new Error(
+				"Could not find MCC for phone number: " +
+					registration.phoneNumber +
+					"\nPlease specify the MCC manually."
+			);
+		}
 
-    const libPhonenumber = await import("libphonenumber-js");
-    const phoneNumber = libPhonenumber.parsePhoneNumber(
-      registration.phoneNumber
-    );
-    if (!phoneNumber?.isValid()) {
-      throw new Error("Invalid phone number: " + registration.phoneNumber);
-    }
+		registration.phoneNumberMobileCountryCode = mcc;
 
-    registration.phoneNumber = phoneNumber.format("E.164");
-    registration.phoneNumberCountryCode = phoneNumber.countryCallingCode;
-    registration.phoneNumberNationalNumber = phoneNumber.nationalNumber;
-    const mcc = PHONENUMBER_MCC[phoneNumber.countryCallingCode];
-    if (!mcc) {
-      throw new Error(
-        "Could not find MCC for phone number: " +
-          registration.phoneNumber +
-          "\nPlease specify the MCC manually."
-      );
-    }
+		async function enterCode() {
+			try {
+				const code = await question("Please enter the one time code:\n");
+				const response = await sock.register(
+					code.replace(/["']/g, "").trim().toLowerCase()
+				);
+				console.log("Successfully registered your phone number.");
+				console.log(response);
+				rl.close();
+			} catch (error) {
+				console.error(
+					"Failed to register your phone number. Please try again.\n",
+					error
+				);
+				await askForOTP();
+			}
+		}
+		async function askForOTP() {
+			if (!registration.method) {
+				await delay(2000);
+				let code = await question(
+					'How would you like to receive the one time code for registration? "sms" or "voice"\n'
+				);
+				code = code.replace(/["']/g, "").trim().toLowerCase();
+				if (code !== "sms" && code !== "voice") {
+					return await askForOTP();
+				}
 
-    registration.phoneNumberMobileCountryCode = mcc;
+				async function enterCaptcha() {
+					const response = await sock.requestRegistrationCode({
+						...registration,
+						method: "captcha",
+					});
+					const path = __dirname + "/captcha.png";
+					fs.writeFileSync(path, Buffer.from(response.image_blob!, "base64"));
 
-    async function enterCode() {
-      try {
-        const code = await question("Please enter the one time code:\n");
-        const response = await sock.register(
-          code.replace(/["']/g, "").trim().toLowerCase()
-        );
-        console.log("Successfully registered your phone number.");
-        console.log(response);
-        rl.close();
-      } catch (error) {
-        console.error(
-          "Failed to register your phone number. Please try again.\n",
-          error
-        );
-        await askForOTP();
-      }
-    }
+					open(path);
+					const code = await question("Please enter the captcha code:\n");
+					fs.unlinkSync(path);
+					registration.captcha = code.replace(/["']/g, "").trim().toLowerCase();
+				}
 
-    async function enterCaptcha() {
-      const response = await sock.requestRegistrationCode({
-        ...registration,
-        method: "captcha",
-      });
-      const path = __dirname + "/captcha.png";
-      fs.writeFileSync(path, Buffer.from(response.image_blob!, "base64"));
+				async function askForOTP() {
+					if (!registration.method) {
+						let code = await question(
+							'How would you like to receive the one time code for registration? "sms" or "voice"\n'
+						);
+						code = code.replace(/["']/g, "").trim().toLowerCase();
+						if (code !== "sms" && code !== "voice") {
+							return await askForOTP();
+						}
 
-      open(path);
-      const code = await question("Please enter the captcha code:\n");
-      fs.unlinkSync(path);
-      registration.captcha = code.replace(/["']/g, "").trim().toLowerCase();
-    }
+						registration.method = code;
+					}
 
-    async function askForOTP() {
-      if (!registration.method) {
-        let code = await question(
-          'How would you like to receive the one time code for registration? "sms" or "voice"\n'
-        );
-        code = code.replace(/["']/g, "").trim().toLowerCase();
-        if (code !== "sms" && code !== "voice") {
-          return await askForOTP();
-        }
+					try {
+						await sock.requestRegistrationCode(registration);
+						await enterCode();
+					} catch (error) {
+						console.error(
+							"Failed to request registration code. Please try again.\n",
+							error
+						);
 
-        registration.method = code;
-      }
+						if (error?.reason === "code_checkpoint") {
+							await enterCaptcha();
+						}
 
-      try {
-        await sock.requestRegistrationCode(registration);
-        await enterCode();
-      } catch (error) {
-        console.error(
-          "Failed to request registration code. Please try again.\n",
-          error
-        );
+						await askForOTP();
+					}
+				}
 
-        if (error?.reason === "code_checkpoint") {
-          await enterCaptcha();
-        }
+				askForOTP();
+			}
+		}
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
+			await sock.presenceSubscribe(jid);
+			await delay(500);
 
-        await askForOTP();
-      }
-    }
+			await sock.sendPresenceUpdate("composing", jid);
+			await delay(2000);
 
-    askForOTP();
-  }
+			await sock.sendPresenceUpdate("paused", jid);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
-    await sock.presenceSubscribe(jid);
-    await delay(500);
+			await sock.sendMessage(jid, msg);
+		};
+	}
 
-    await sock.sendPresenceUpdate("composing", jid);
-    await delay(2000);
+	// the process function lets you process all events that just occurred
+	// efficiently in a batch
+	sock.ev.process(
+		// events is a map for event name => event data
+		async (events) => {
+			// something about the connection changed
+			// maybe it closed, or we received all offline message or connection opened
+			if (events["connection.update"]) {
+				const update = events["connection.update"];
+				const { connection, lastDisconnect } = update;
+				if (connection === "close") {
+					// reconnect if not logged out
+					if (
+						(lastDisconnect?.error as Boom)?.output?.statusCode !==
+						DisconnectReason.loggedOut
+					) {
+						startSock();
+					} else {
+						console.log("Connection closed. You are logged out.");
+						// await mongoClient.db("whatsapp-sessions").dropDatabase(); // delete db,
+						await removeCreds(); // delete auth creds, usefull if you're combining mongodb with redis
+						startSock();
+					}
+				}
 
-    await sock.sendPresenceUpdate("paused", jid);
 
-    await sock.sendMessage(jid, msg);
-  };
+				// WARNING: THIS WILL SEND A WAM EXAMPLE AND THIS IS A ****CAPTURED MESSAGE.****
+				// DO NOT ACTUALLY ENABLE THIS UNLESS YOU MODIFIED THE FILE.JSON!!!!!
+				// THE ANALYTICS IN THE FILE ARE OLD. DO NOT USE THEM.
+				// YOUR APP SHOULD HAVE GLOBALS AND ANALYTICS ACCURATE TO TIME, DATE AND THE SESSION
+				// THIS FILE.JSON APPROACH IS JUST AN APPROACH I USED, BE FREE TO DO THIS IN ANOTHER WAY.
+				// THE FIRST EVENT CONTAINS THE CONSTANT GLOBALS, EXCEPT THE seqenceNumber(in the event) and commitTime
+				// THIS INCLUDES STUFF LIKE ocVersion WHICH IS CRUCIAL FOR THE PREVENTION OF THE WARNING
+				// const sendWAMExample = false;
+				// if (connection === "open" && sendWAMExample) {
+				// 	/// sending WAM EXAMPLE
+				// 	const {
+				// 		header: { wamVersion, eventSequenceNumber },
+				// 		events,
+				// 	} = JSON.parse(
+				// 		await fs.promises.readFile("./boot_analytics_test.json", "utf-8")
+				// 	);
 
-  // the process function lets you process all events that just occurred
-  // efficiently in a batch
-  sock.ev.process(
-    // events is a map for event name => event data
-    async (events) => {
-      // something about the connection changed
-      // maybe it closed, or we received all offline message or connection opened
-      if (events["connection.update"]) {
-        const update = events["connection.update"];
-        const { connection, lastDisconnect } = update;
-        if (connection === "close") {
-          // reconnect if not logged out
-          if (
-            (lastDisconnect?.error as Boom)?.output?.statusCode !==
-            DisconnectReason.loggedOut
-          ) {
-            startSock();
-          } else {
-            console.log("Connection closed. You are logged out.");
-            // await mongoClient.db("whatsapp-sessions").dropDatabase(); // delete db,
-            await removeCreds(); // delete auth creds, usefull if you're combining mongodb with redis
-            startSock();
-          }
-        }
+				// 	const binaryInfo = new BinaryInfo({
+				// 		protocolVersion: wamVersion,
+				// 		sequence: eventSequenceNumber,
+				// 		events: events,
+				// 	});
 
-        console.log("connection update", update);
-      }
+				// 	const buffer = encodeWAM(binaryInfo);
 
-      // credentials updated -- save them
-      if (events["creds.update"]) {
-        await saveCreds();
-      }
+				// 	const result = await sock.sendWAMBuffer(buffer);
+				// 	console.log(result);
+				// }
 
-      if (events["labels.association"]) {
-        console.log(events["labels.association"]);
-      }
+				// await sock.sendPresenceUpdate("paused", jid);
 
-      if (events["labels.edit"]) {
-        console.log(events["labels.edit"]);
-      }
+				// await sock.sendMessage(jid, msg);
 
-      if (events.call) {
-        console.log("recv call event", events.call);
-      }
 
-      // history received
-      if (events["messaging-history.set"]) {
-        const { chats, contacts, messages, isLatest } =
-          events["messaging-history.set"];
-        console.log(
-          `recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest})`
-        );
-      }
 
-      // received a new message
-      if (events["messages.upsert"]) {
-        const upsert = events["messages.upsert"];
-        console.log("recv messages ", JSON.stringify(upsert, undefined, 2));
+				console.log("connection update", update);
+			}
 
-        if (upsert.type === "notify") {
-          for (const msg of upsert.messages) {
-            if (/* msg.key.fromMe */ msg.pushName === "RONY" && doReplies) {
-              console.log("replying to", msg.key.remoteJid);
-              // await sock.readMessages([msg.key]);
+			// credentials updated -- save them
+			if (events["creds.update"]) {
+				await saveCreds();
+			}
 
-              sock.sendMessage(
-                msg.key.remoteJid!,
-                // Send reaction
-                { text: "👍" },
-                { ephemeralExpiration: 1 * 60 }
-              );
-            }
-          }
-        }
-      }
+			if (events["labels.association"]) {
+				console.log(events["labels.association"]);
+			}
 
-      // messages updated like status delivered, message deleted etc.
-      if (events["messages.update"]) {
-        console.log(JSON.stringify(events["messages.update"], undefined, 2));
+			if (events["labels.edit"]) {
+				console.log(events["labels.edit"]);
+			}
 
-        for (const { key, update } of events["messages.update"]) {
-          if (update.pollUpdates) {
-            const pollCreation = await getMessage(key);
-            if (pollCreation) {
-              console.log(
-                "got poll update, aggregation: ",
-                getAggregateVotesInPollMessage({
-                  message: pollCreation,
-                  pollUpdates: update.pollUpdates,
-                })
-              );
-            }
-          }
-        }
-      }
+			if (events.call) {
+				console.log("recv call event", events.call);
+			}
 
-      if (events["message-receipt.update"]) {
-        console.log(events["message-receipt.update"]);
-      }
+			// history received
+			if (events["messaging-history.set"]) {
+				const { chats, contacts, messages, isLatest } =
+					events["messaging-history.set"];
+				console.log(
+					`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest})`
+				);
+			}
 
-      if (events["messages.reaction"]) {
-        console.log(events["messages.reaction"]);
-      }
+			// received a new message
+			if (events["messages.upsert"]) {
+				const upsert = events["messages.upsert"];
+				console.log("recv messages ", JSON.stringify(upsert, undefined, 2));
 
-      if (events["presence.update"]) {
-        console.log(events["presence.update"]);
-      }
+				if (upsert.type === "notify") {
+					for (const msg of upsert.messages) {
+						if (!msg.key.fromMe && doReplies) {
+							console.log("replying to", msg.key.remoteJid);
+							// await sock.readMessages([msg.key]);
 
-      if (events["chats.update"]) {
-        console.log(events["chats.update"]);
-      }
+							sock.sendMessage(
+								msg.key.remoteJid!,
+								{ text: "👍" },
+								{ ephemeralExpiration: 1 * 60 }
+							);
+						}
+					}
+				}
+			}
 
-      if (events["contacts.update"]) {
-        for (const update of events["contacts.update"]) {
-          if (update.imgUrl === "changed") {
-            const contact = await store?.getContactInfo(update.id!, sock);
-            console.log(
-              `contact ${contact?.name} ${contact?.id} has a new profile pic: ${contact?.imgUrl}`
-            );
-          }
-        }
-      }
+			// messages updated like status delivered, message deleted etc.
+			if (events["messages.update"]) {
+				console.log(JSON.stringify(events["messages.update"], undefined, 2));
 
-      if (events["chats.delete"]) {
-        console.log("chats deleted ", events["chats.delete"]);
-      }
-    }
-  );
+				for (const { key, update } of events["messages.update"]) {
+					if (update.pollUpdates) {
+						const pollCreation = await getMessage(key);
+						if (pollCreation) {
+							console.log(
+								"got poll update, aggregation: ",
+								getAggregateVotesInPollMessage({
+									message: pollCreation,
+									pollUpdates: update.pollUpdates,
+								})
+							);
+						}
+					}
+				}
+			}
 
-  return sock;
+			if (events["message-receipt.update"]) {
+				console.log(events["message-receipt.update"]);
+			}
 
-  async function getMessage(
-    key: WAMessageKey
-  ): Promise<WAMessageContent | undefined> {
-    if (store) {
-      const msg = await store.loadMessage(key.remoteJid!, key.id!);
-      return msg?.message || undefined;
-    }
+			if (events["messages.reaction"]) {
+				console.log(events["messages.reaction"]);
+			}
 
-    // only if store is present
-    return proto.Message.fromObject({});
-  }
+			if (events["presence.update"]) {
+				console.log(events["presence.update"]);
+			}
+
+			if (events["chats.update"]) {
+				console.log(events["chats.update"]);
+			}
+
+			if (events["contacts.update"]) {
+				for (const update of events["contacts.update"]) {
+					if (update.imgUrl === "changed") {
+						const contact = await store?.getContactInfo(update.id!, sock);
+						console.log(
+							`contact ${contact?.name} ${contact?.id} has a new profile pic: ${contact?.imgUrl}`
+						);
+					}
+				}
+			}
+
+			if (events["chats.delete"]) {
+				console.log("chats deleted ", events["chats.delete"]);
+			}
+		}
+	);
+
+	return sock;
 };
 
 try {
-  startSock();
+	startSock();
 } catch (e) {
-  startSock();
+	startSock();
 }

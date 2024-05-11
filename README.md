@@ -29,6 +29,8 @@ import makeWASocket, { ... } from '@iamrony777/baileys'
 
 ## Connecting multi device (recommended)
 
+### **I recommend to use Redis for storing auth data (as it is the fastest) and Mongo for storing chats, messages**
+
 WhatsApp provides a multi-device API that allows Baileys to be authenticated as a second WhatsApp client by scanning a QR code with WhatsApp on your phone.
 
 ``` ts
@@ -126,6 +128,28 @@ If the connection is successful, you will see a QR code printed on your terminal
 **Note:** install `qrcode-terminal` using `yarn add qrcode-terminal` to auto-print the QR to the terminal.
 
 **Note:** the code to support the legacy version of WA Web (pre multi-device) has been removed in v5. Only the standard multi-device connection is now supported. This is done as WA seems to have completely dropped support for the legacy version.
+
+
+**Note:** I didn't add the search-by-contact-hash [implementation by purpshell](https://github.com/WhiskeySockets/Baileys/blob/ce325d11828b6f32584b39e7e427aa47b0ee555d/src/Store/make-in-memory-store.ts#L177-L181)  
+
+## Custom funtions added to this package
+
+### 1. `store?.getContactInfo(jid: string, socket: typeof makeWASocket)`
+
+```typescript
+if (events["contacts.update"]) {
+  for (const update of events["contacts.update"]) {
+    if (update.imgUrl === "changed") { // getting 
+      const contact = await store?.getContactInfo(update.id!, sock);
+      console.log(
+        `contact ${contact?.name} ${contact?.id} has a new profile pic: ${contact?.imgUrl}`
+      );
+    }
+  }
+}
+```
+
+
 
 
 ## Everything besides store and auth connectors are same as the original repo.

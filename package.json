@@ -1,6 +1,6 @@
 {
   "name": "@iamrony777/baileys",
-  "version": "6.6.0",
+  "version": "6.7.0",
   "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
@@ -36,7 +36,9 @@
     "changelog:last": "conventional-changelog -p angular -r 2",
     "changelog:preview": "conventional-changelog -p angular -u",
     "changelog:update": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
-    "example": "tsx Example/example.ts",
+    "example": "tsx --inspect Example/example.ts",
+    "example:node": "node --inspect -r ts-node/register Example/example.ts",
+    "example:mobile": "node --inspect -r ts-node/register Example/example.ts --mobile",
     "gen:protobuf": "sh WAProto/GenerateStatics.sh",
     "lint": "eslint src --ext .js,.ts,.jsx,.tsx",
     "lint:fix": "eslint src --fix --ext .js,.ts,.jsx,.tsx",
@@ -90,7 +92,12 @@
     "ts-node": "^10.9.1",
     "tsx": "^4.7.2",
     "typedoc": "^0.25.3",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "jimp": "^0.16.1",
+    "link-preview-js": "^3.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.30.5",
+    "json": "^11.0.0"
   },
   "peerDependencies": {
     "jimp": "^0.22.10",

@@ -24,3 +24,4 @@ package-lock.json
 *.store.json
 # Sentry Config File
 .sentryclirc
+*lock*
