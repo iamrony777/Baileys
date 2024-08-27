@@ -3,6 +3,7 @@ import axios from 'axios'
 import { randomBytes } from 'crypto'
 import { promises as fs } from 'fs'
 import { Logger } from 'pino'
+import { type Transform } from 'stream'
 import { proto } from '../../WAProto'
 import { MEDIA_KEYS, URL_REGEX, WA_DEFAULT_EPHEMERAL } from '../Defaults'
 import {
@@ -60,8 +61,6 @@ const MessageTypeProto = {
 	'sticker': WAProto.Message.StickerMessage,
    	'document': WAProto.Message.DocumentMessage,
 } as const
-
-const ButtonType = proto.Message.ButtonsMessage.HeaderType
 
 /**
  * Uses a regex to test whether the string contains a URL, and returns the URL if it does.
@@ -405,6 +404,34 @@ export const generateWAMessageContent = async(
 			(message.disappearingMessagesInChat ? WA_DEFAULT_EPHEMERAL : 0) :
 			message.disappearingMessagesInChat
 		m = prepareDisappearingMessageSettingContent(exp)
+	} else if('groupInvite' in message) {
+		m.groupInviteMessage = {}
+		m.groupInviteMessage.inviteCode = message.groupInvite.inviteCode
+		m.groupInviteMessage.inviteExpiration = message.groupInvite.inviteExpiration
+		m.groupInviteMessage.caption = message.groupInvite.text
+
+		m.groupInviteMessage.groupJid = message.groupInvite.jid
+		m.groupInviteMessage.groupName = message.groupInvite.subject
+		//TODO: use built-in interface and get disappearing mode info etc.
+		//TODO: cache / use store!?
+		if(options.getProfilePicUrl) {
+			const pfpUrl = await options.getProfilePicUrl(message.groupInvite.jid, 'preview')
+			if(pfpUrl) {
+				const resp = await axios.get(pfpUrl, { responseType: 'arraybuffer' })
+				if(resp.status === 200) {
+					m.groupInviteMessage.jpegThumbnail = resp.data
+				}
+			}
+		}
+	} else if('pin' in message) {
+		m.pinInChatMessage = {}
+		m.messageContextInfo = {}
+
+		m.pinInChatMessage.key = message.pin
+		m.pinInChatMessage.type = message.type
+		m.pinInChatMessage.senderTimestampMs = Date.now()
+
+		m.messageContextInfo.messageAddOnDurationInSecs = message.type === 1 ? message.time || 86400 : 0
 	} else if('buttonReply' in message) {
 		switch (message.type) {
 		case 'template':
@@ -422,6 +449,12 @@ export const generateWAMessageContent = async(
 			}
 			break
 		}
+	} else if('ptv' in message && message.ptv) {
+		const { videoMessage } = await prepareWAMessageMedia(
+			{ video: message.video },
+			options
+		)
+		m.ptvMessage = videoMessage
 	} else if('product' in message) {
 		const { imageMessage } = await prepareWAMessageMedia(
 			{ image: message.product.productImage },
@@ -438,6 +471,7 @@ export const generateWAMessageContent = async(
 		m.listResponseMessage = { ...message.listReply }
 	} else if('poll' in message) {
 		message.poll.selectableCount ||= 0
+		message.poll.toAnnouncementGroup ||= false
 
 		if(!Array.isArray(message.poll.values)) {
 			throw new Boom('Invalid poll values', { statusCode: 400 })
@@ -458,10 +492,23 @@ export const generateWAMessageContent = async(
 			messageSecret: message.poll.messageSecret || randomBytes(32),
 		}
 
-		m.pollCreationMessage = {
+		const pollCreationMessage = {
 			name: message.poll.name,
 			selectableOptionsCount: message.poll.selectableCount,
 			options: message.poll.values.map(optionName => ({ optionName })),
+		}
+
+		if (message.poll.toAnnouncementGroup) {
+			// poll v2 is for community announcement groups (single select and multiple)
+			m.pollCreationMessageV2 = pollCreationMessage
+		} else {
+			if(message.poll.selectableCount > 0) {
+				//poll v3 is for single select polls
+				m.pollCreationMessageV3 = pollCreationMessage
+			} else {
+				// poll v3 for multiple choice polls
+				m.pollCreationMessage = pollCreationMessage
+			}
 		}
 	} else if('sharePhoneNumber' in message) {
 		m.protocolMessage = {
@@ -474,70 +521,6 @@ export const generateWAMessageContent = async(
 			message,
 			options
 		)
-	}
-
-	if('buttons' in message && !!message.buttons) {
-		const buttonsMessage: proto.Message.IButtonsMessage = {
-			buttons: message.buttons.map(b => ({ ...b, type: proto.Message.ButtonsMessage.Button.Type.RESPONSE }))
-		}
-		if('text' in message) {
-			buttonsMessage.contentText = message.text
-			buttonsMessage.headerType = ButtonType.EMPTY
-		} else {
-			if('caption' in message) {
-				buttonsMessage.contentText = message.caption
-			}
-
-			const type = Object.keys(m)[0].replace('Message', '').toUpperCase()
-			buttonsMessage.headerType = ButtonType[type]
-
-			Object.assign(buttonsMessage, m)
-		}
-
-		if('footer' in message && !!message.footer) {
-			buttonsMessage.footerText = message.footer
-		}
-
-		m = { buttonsMessage }
-	} else if('templateButtons' in message && !!message.templateButtons) {
-		const msg: proto.Message.TemplateMessage.IHydratedFourRowTemplate = {
-			hydratedButtons: message.templateButtons
-		}
-
-		if('text' in message) {
-			msg.hydratedContentText = message.text
-		} else {
-
-			if('caption' in message) {
-				msg.hydratedContentText = message.caption
-			}
-
-			Object.assign(msg, m)
-		}
-
-		if('footer' in message && !!message.footer) {
-			msg.hydratedFooterText = message.footer
-		}
-
-		m = {
-			templateMessage: {
-				fourRowTemplate: msg,
-				hydratedTemplate: msg
-			}
-		}
-	}
-
-	if('sections' in message && !!message.sections) {
-		const listMessage: proto.Message.IListMessage = {
-			sections: message.sections,
-			buttonText: message.buttonText,
-			title: message.title,
-			footerText: message.footer,
-			description: message.text,
-			listType: proto.Message.ListMessage.ListType.SINGLE_SELECT
-		}
-
-		m = { listMessage }
 	}
 
 	if('viewOnce' in message && !!message.viewOnce) {
@@ -879,31 +862,31 @@ const REUPLOAD_REQUIRED_STATUS = [410, 404]
 /**
  * Downloads the given message. Throws an error if it's not a media message
  */
-export const downloadMediaMessage = async(
+export const downloadMediaMessage = async<Type extends 'buffer' | 'stream'>(
 	message: WAMessage,
-	type: 'buffer' | 'stream',
+	type: Type,
 	options: MediaDownloadOptions,
 	ctx?: DownloadMediaMessageContext
 ) => {
-	try {
-		const result = await downloadMsg()
-		return result
-	} catch(error) {
-		if(ctx) {
-			if(axios.isAxiosError(error)) {
-				// check if the message requires a reupload
-				if(REUPLOAD_REQUIRED_STATUS.includes(error.response?.status!)) {
-					ctx.logger.info({ key: message.key }, 'sending reupload media request...')
-					// request reupload
-					message = await ctx.reuploadRequest(message)
-					const result = await downloadMsg()
-					return result
+	const result = await downloadMsg()
+		.catch(async(error) => {
+			if(ctx) {
+				if(axios.isAxiosError(error)) {
+					// check if the message requires a reupload
+					if(REUPLOAD_REQUIRED_STATUS.includes(error.response?.status!)) {
+						ctx.logger.info({ key: message.key }, 'sending reupload media request...')
+						// request reupload
+						message = await ctx.reuploadRequest(message)
+						const result = await downloadMsg()
+						return result
+					}
 				}
 			}
-		}
 
-		throw error
-	}
+			throw error
+		})
+
+	return result as Type extends 'buffer' ? Buffer : Transform
 
 	async function downloadMsg() {
 		const mContent = extractMessageContent(message.message)

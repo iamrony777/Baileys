@@ -1,6 +1,6 @@
 {
   "name": "@iamrony777/baileys",
-  "version": "6.7.2-1",
+  "version": "6.7.7",
   "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
@@ -58,7 +58,6 @@
     "futoin-hkdf": "^1.5.3",
     "jimp": "^0.22.10",
     "libphonenumber-js": "^1.10.49",
-    "libsignal": "github:adiwajshing/libsignal-node",
     "link-preview-js": "^3.0.5",
     "moment-timezone": "^0.5.43",
     "mongodb": "^6.2.0",
@@ -70,8 +69,11 @@
     "react": "^18.2.0",
     "redis": "^4.6.10",
     "sharp": "^0.32.6",
-    "uuid": "^9.0.1",
-    "ws": "^8.14.2"
+    "ws": "^8.14.2",
+    "async-lock": "^1.4.1",
+    "libsignal": "github:WhiskeySockets/libsignal-node",
+    "lodash": "^4.17.21",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@adiwajshing/eslint-config": "github:adiwajshing/eslint-config",
@@ -93,11 +95,11 @@
     "tsx": "^4.7.2",
     "typedoc": "^0.25.3",
     "typescript": "^5.2.2",
-    "jimp": "^0.16.1",
-    "link-preview-js": "^3.0.0",
+    "jimp": "^0.22.10",
+    "json": "^11.0.0",
+    "link-preview-js": "^3.0.5",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.30.5",
-    "json": "^11.0.0"
+    "sharp": "^0.32.6"
   },
   "peerDependencies": {
     "jimp": "^0.22.10",

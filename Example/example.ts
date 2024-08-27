@@ -21,6 +21,7 @@ import makeWASocket, {
 	useRedisAuthState, // redis auth
 	WAMessageContent,
 	WAMessageKey,
+	isJidNewsletter,
 } from "../src";
 import { makeLibSignalRepository } from "../src/Signal/libsignal";
 import MAIN_LOGGER from "../src/Utils/logger";
@@ -51,6 +52,8 @@ const useMobile = process.argv.includes("--mobile");
 // external map to store retry counts of messages when decryption/encryption fails
 // keep this out of the socket itself, so as to prevent a message decryption/encryption loop across socket restarts
 const msgRetryCounterCache = new NodeCache();
+
+const onDemandMap = new Map<string, string>();
 
 // Read line interface
 const rl = readline.createInterface({
@@ -277,19 +280,19 @@ const startSock = async () => {
 				askForOTP();
 			}
 		}
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
-			await sock.presenceSubscribe(jid);
-			await delay(500);
-
-			await sock.sendPresenceUpdate("composing", jid);
-			await delay(2000);
-
-			await sock.sendPresenceUpdate("paused", jid);
-
-			await sock.sendMessage(jid, msg);
-		};
 	}
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
+		await sock.presenceSubscribe(jid);
+		await delay(500);
+
+		await sock.sendPresenceUpdate("composing", jid);
+		await delay(2000);
+
+		await sock.sendPresenceUpdate("paused", jid);
+
+		await sock.sendMessage(jid, msg);
+	};
 
 	// the process function lets you process all events that just occurred
 	// efficiently in a batch
@@ -315,7 +318,6 @@ const startSock = async () => {
 						startSock();
 					}
 				}
-
 
 				// WARNING: THIS WILL SEND A WAM EXAMPLE AND THIS IS A ****CAPTURED MESSAGE.****
 				// DO NOT ACTUALLY ENABLE THIS UNLESS YOU MODIFIED THE FILE.JSON!!!!!
@@ -350,8 +352,6 @@ const startSock = async () => {
 
 				// await sock.sendMessage(jid, msg);
 
-
-
 				console.log("connection update", update);
 			}
 
@@ -374,10 +374,13 @@ const startSock = async () => {
 
 			// history received
 			if (events["messaging-history.set"]) {
-				const { chats, contacts, messages, isLatest } =
+				const { chats, contacts, messages, isLatest, progress, syncType } =
 					events["messaging-history.set"];
+				if (syncType === proto.HistorySync.HistorySyncType.ON_DEMAND) {
+					console.log("received on-demand history sync, messages=", messages);
+				}
 				console.log(
-					`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest})`
+					`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest}, progress: ${progress}%), type: ${syncType}`
 				);
 			}
 
@@ -388,14 +391,85 @@ const startSock = async () => {
 
 				if (upsert.type === "notify") {
 					for (const msg of upsert.messages) {
-						if (!msg.key.fromMe && doReplies) {
-							console.log("replying to", msg.key.remoteJid);
-							// await sock.readMessages([msg.key]);
+						//TODO: More built-in implementation of this
+						/* if (
+							msg.message?.protocolMessage?.type ===
+							proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION
+						  ) {
+							const historySyncNotification = getHistoryMsg(msg.message)
+							if (
+							  historySyncNotification?.syncType ==
+							  proto.HistorySync.HistorySyncType.ON_DEMAND
+							) {
+							  const { messages } =
+								await downloadAndProcessHistorySyncNotification(
+								  historySyncNotification,
+								  {}
+								)
 
-							sock.sendMessage(
-								msg.key.remoteJid!,
-								{ text: "👍" },
-								{ ephemeralExpiration: 1 * 60 }
+								
+								const chatId = onDemandMap.get(
+									historySyncNotification!.peerDataRequestSessionId!
+								)
+								
+								console.log(messages)
+
+							  onDemandMap.delete(
+								historySyncNotification!.peerDataRequestSessionId!
+							  )
+
+							  /*
+								// 50 messages is the limit imposed by whatsapp
+								//TODO: Add ratelimit of 7200 seconds
+								//TODO: Max retries 10
+								const messageId = await sock.fetchMessageHistory(
+									50,
+									oldestMessageKey,
+									oldestMessageTimestamp
+								)
+								onDemandMap.set(messageId, chatId)
+							}
+						  } */
+
+						if (
+							msg.message?.conversation ||
+							msg.message?.extendedTextMessage?.text
+						) {
+							const text =
+								msg.message?.conversation ||
+								msg.message?.extendedTextMessage?.text;
+							if (text == "requestPlaceholder" && !upsert.requestId) {
+								const messageId = await sock.requestPlaceholderResend(msg.key);
+								console.log("requested placeholder resync, id=", messageId);
+							} else if (upsert.requestId) {
+								console.log(
+									"Message received from phone, id=",
+									upsert.requestId,
+									msg
+								);
+							}
+
+							// go to an old chat and send this
+							if (text == "onDemandHistSync") {
+								const messageId = await sock.fetchMessageHistory(
+									50,
+									msg.key,
+									msg.messageTimestamp!
+								);
+								console.log("requested on-demand sync, id=", messageId);
+							}
+						}
+
+						if (
+							!msg.key.fromMe &&
+							doReplies &&
+							!isJidNewsletter(msg.key?.remoteJid!)
+						) {
+							console.log("replying to", msg.key.remoteJid);
+							await sock!.readMessages([msg.key]);
+							await sendMessageWTyping(
+								{ text: "Hello there!" },
+								msg.key.remoteJid!
 							);
 						}
 					}

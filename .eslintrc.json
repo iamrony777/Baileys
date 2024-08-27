@@ -5,7 +5,8 @@
         "project": "./tsconfig.json"
     },
     "ignorePatterns": [
-        "src/Tests/*", "Example/*"
+        "src/Tests/*",
+        "Example/*"
     ],
     "rules": {
         "@typescript-eslint/no-explicit-any": [
@@ -32,6 +33,9 @@
         ],
         "no-constant-binary-expression": [
             "off"
+        ],
+        "keyword-spacing": [
+            "warn"
         ]
     }
 }
