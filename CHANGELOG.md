@@ -1,4 +1,4 @@
-## [6.7.9-1](https://github.com/iamrony777/Baileys/compare/v6.7.7-1...v6.7.9-1) (2025-01-06)
+## [6.7.9-2](https://github.com/iamrony777/Baileys/compare/v6.7.7-1...v6.7.9-2) (2025-01-06)
 
 
 ### Bug Fixes
