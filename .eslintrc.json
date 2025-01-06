@@ -1,5 +1,5 @@
 {
-    "extends": "@adiwajshing",
+    "extends": "@whiskeysockets",
     "parserOptions": {
         "sourceType": "module",
         "project": "./tsconfig.json"

@@ -135,6 +135,7 @@ If the connection is successful, you will see a QR code printed on your terminal
 ## Custom funtions added to this package
 
 ### 1. `store?.getContactInfo(jid: string, socket: typeof makeWASocket)`
+## Configuring the Connection
 
 ```typescript
 if (events["contacts.update"]) {

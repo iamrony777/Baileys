@@ -38,7 +38,7 @@ const generateMac = (operation: proto.SyncdMutation.SyncdOperation, data: Buffer
 		}
 
 		const buff = Buffer.from([r])
-		return Buffer.concat([buff, Buffer.from(keyId as any, 'base64')])
+		return Buffer.concat([buff, Buffer.from(keyId as string, 'base64')])
 	}
 
 	const keyData = getKeyData()
@@ -276,7 +276,7 @@ export const decodeSyncdPatch = async(
 
 export const extractSyncdPatches = async(
 	result: BinaryNode,
-	options: AxiosRequestConfig<any>
+	options: AxiosRequestConfig<{}>
 ) => {
 	const syncNode = getBinaryNodeChild(result, 'sync')
 	const collectionNodes = getBinaryNodeChildren(syncNode, 'collection')
@@ -334,7 +334,7 @@ export const extractSyncdPatches = async(
 
 export const downloadExternalBlob = async(
 	blob: proto.IExternalBlobReference,
-	options: AxiosRequestConfig<any>
+	options: AxiosRequestConfig<{}>
 ) => {
 	const stream = await downloadContentFromMessage(blob, 'md-app-state', { options })
 	const bufferArray: Buffer[] = []
@@ -347,7 +347,7 @@ export const downloadExternalBlob = async(
 
 export const downloadExternalPatch = async(
 	blob: proto.IExternalBlobReference,
-	options: AxiosRequestConfig<any>
+	options: AxiosRequestConfig<{}>
 ) => {
 	const buffer = await downloadExternalBlob(blob, options)
 	const syncData = proto.SyncdMutations.decode(buffer)
@@ -408,7 +408,7 @@ export const decodePatches = async(
 	syncds: proto.ISyncdPatch[],
 	initial: LTHashState,
 	getAppStateSyncKey: FetchAppStateSyncKey,
-	options: AxiosRequestConfig<any>,
+	options: AxiosRequestConfig<{}>,
 	minimumVersionNumber?: number,
 	logger?: Logger,
 	validateMacs = true
@@ -420,8 +420,7 @@ export const decodePatches = async(
 
 	const mutationMap: ChatMutationMap = {}
 
-	for(let i = 0; i < syncds.length; i++) {
-		const syncd = syncds[i]
+	for(const syncd of syncds) {
 		const { version, keyId, snapshotMac } = syncd
 		if(syncd.externalMutations) {
 			logger?.trace({ name, version }, 'downloading external patch')
@@ -553,23 +552,29 @@ export const chatModificationToAppPatch = (
 			apiVersion: 3,
 			operation: OP.SET
 		}
+	} else if('deleteForMe' in mod) {
+		const { timestamp, key, deleteMedia } = mod.deleteForMe
+		patch = {
+			syncAction: {
+				deleteMessageForMeAction: {
+					deleteMedia,
+					messageTimestamp: timestamp
+				}
+			},
+			index: ['deleteMessageForMe', jid, key.id!, key.fromMe ? '1' : '0', '0'],
+			type: 'regular_high',
+			apiVersion: 3,
+			operation: OP.SET
+		}
 	} else if('clear' in mod) {
-		if(mod.clear === 'all') {
-			throw new Boom('not supported')
-		} else {
-			const key = mod.clear.messages[0]
-			patch = {
-				syncAction: {
-					deleteMessageForMeAction: {
-						deleteMedia: false,
-						messageTimestamp: key.timestamp
-					}
-				},
-				index: ['deleteMessageForMe', jid, key.id, key.fromMe ? '1' : '0', '0'],
-				type: 'regular_high',
-				apiVersion: 3,
-				operation: OP.SET
-			}
+		patch = {
+			syncAction: {
+				clearChatAction: {} // add message range later
+			},
+			index: ['clearChat', jid, '1' /*the option here is 0 when keep starred messages is enabled*/, '0'],
+			type: 'regular_high',
+			apiVersion: 6,
+			operation: OP.SET
 		}
 	} else if('pin' in mod) {
 		patch = {
@@ -618,6 +623,21 @@ export const chatModificationToAppPatch = (
 			index: ['setting_pushName'],
 			type: 'critical_block',
 			apiVersion: 1,
+			operation: OP.SET,
+		}
+	} else if('addLabel' in mod) {
+		patch = {
+			syncAction: {
+				labelEditAction: {
+					name: mod.addLabel.name,
+					color: mod.addLabel.color,
+					predefinedId : mod.addLabel.predefinedId,
+					deleted: mod.addLabel.deleted
+				}
+			},
+			index: ['label_edit', mod.addLabel.id],
+			type: 'regular',
+			apiVersion: 3,
 			operation: OP.SET,
 		}
 	} else if('addChatLabel' in mod) {

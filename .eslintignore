@@ -7,4 +7,5 @@ src/WABinary/index.ts
 WAProto
 WASignalGroup
 # Example/test.ts
+Example/Example.ts
 docs
