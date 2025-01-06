@@ -1,35 +1,72 @@
-## [6.7.2](https://github.com/iamrony777/Baileys/compare/v6.5.0-10...v6.7.2) (2024-05-11)
+## [6.7.9-1](https://github.com/iamrony777/Baileys/compare/v6.7.7-1...v6.7.9-1) (2025-01-06)
 
 
 ### Bug Fixes
 
 * **#681:** Fixed import (credit to [#611](https://github.com/iamrony777/Baileys/issues/611)) ([c218f37](https://github.com/iamrony777/Baileys/commit/c218f3746e18ff75d552e130ccf01f30280e1e16))
+* do not fetch group metadata for status ([#986](https://github.com/iamrony777/Baileys/issues/986)) ([09f8df4](https://github.com/iamrony777/Baileys/commit/09f8df445c8c3d6b4d709de33c65bb3df4caf7d5)), closes [#985](https://github.com/iamrony777/Baileys/issues/985)
+* downloadMediaMessage return type matched parameter ([#757](https://github.com/iamrony777/Baileys/issues/757)) ([2ae664c](https://github.com/iamrony777/Baileys/commit/2ae664c6550804795cc0fb25c05b147d9633a887))
 * enable viewOnce messages to quote ([#736](https://github.com/iamrony777/Baileys/issues/736)) ([03f82f5](https://github.com/iamrony777/Baileys/commit/03f82f599ec687117b17381593dd9c4c945c37d9))
 * find platform type based on browser second argument ([32533ed](https://github.com/iamrony777/Baileys/commit/32533ed7f6ebbd8bd70a0a871c43ee0b579b8ce8)), closes [#481](https://github.com/iamrony777/Baileys/issues/481) [#228](https://github.com/iamrony777/Baileys/issues/228)
 * fix message content type detection ([a07922b](https://github.com/iamrony777/Baileys/commit/a07922b136e84d99f036b7d51bfe1cead8236368))
 * fix pairing code ([abe4256](https://github.com/iamrony777/Baileys/commit/abe42564bed1d2f34014ef580d249a644142bdc2))
+* **fix-routing-info:** initial commit ([#837](https://github.com/iamrony777/Baileys/issues/837)) ([d7037cf](https://github.com/iamrony777/Baileys/commit/d7037cf6fab71d86128c6f3eb4aeaeb3e7eccec3))
+* **fix/buttons-deprecation:** initial/final commit ([#956](https://github.com/iamrony777/Baileys/issues/956)) ([35f6d75](https://github.com/iamrony777/Baileys/commit/35f6d75cf8609f2c7633bd58373672c79f722c8b))
+* Fixed contacts.update when received changed picture event ([#979](https://github.com/iamrony777/Baileys/issues/979)) ([c02b772](https://github.com/iamrony777/Baileys/commit/c02b772de0ad2e8b418a807a1fb174590d298c68))
 * inefficient method of extracting url from text ([#741](https://github.com/iamrony777/Baileys/issues/741)) ([f5c1aff](https://github.com/iamrony777/Baileys/commit/f5c1affc4d97c00e01cdbff6e2575a18ddf896fc))
+* invalid children for header "companion_platform_id": 49 (number) ([#897](https://github.com/iamrony777/Baileys/issues/897)) ([fdf9d48](https://github.com/iamrony777/Baileys/commit/fdf9d4816283a8a10145112965e3d8ea05b919e1))
+* **master:** Deploy docs to custom CNAME (baileys.whiskeysockets.io) ([f25f836](https://github.com/iamrony777/Baileys/commit/f25f83656a7cadbcdaf66b7fea72b9d4b3a72aa0))
+* **master:** error in init queries ([fbbb511](https://github.com/iamrony777/Baileys/commit/fbbb511fb8464ea744e2abc416c8cef54c0e317c))
 * **master:** final workflow fix ([eb5eddd](https://github.com/iamrony777/Baileys/commit/eb5edddf2fe847159c308fba314c5ad4f27df467))
 * **master:** fix lockfile ([0792755](https://github.com/iamrony777/Baileys/commit/07927554a2a7689b0e024e4ce3fe67c599b242ed))
+* **master:** fix lockfile (after [#847](https://github.com/iamrony777/Baileys/issues/847)) ([c964615](https://github.com/iamrony777/Baileys/commit/c964615cf9b2eaaa6f72e2bd5fa660eb2ae9ab9b))
 * **master:** fix whiskeysockets publishing ([649dee4](https://github.com/iamrony777/Baileys/commit/649dee41eb734d5675068e9795c5904e50a8bcb9))
+* **master:** Fixes prop hash reset due to missing property in the response ([bf578c7](https://github.com/iamrony777/Baileys/commit/bf578c79e797c9e3a270fede674f840b3d2496cb))
+* **master:** generate new message id ([0cc888e](https://github.com/iamrony777/Baileys/commit/0cc888e87bc931d7608cdc78c536de3d8ee4cb82))
+* **master:** linting ([88cf6f5](https://github.com/iamrony777/Baileys/commit/88cf6f52347fe31ac91d300daa3de66fc70cfc59))
+* **master:** linting and making functionality better ([5ffa3a5](https://github.com/iamrony777/Baileys/commit/5ffa3a51b65b53ebf5c85ac327c281f2fd7c7a33))
+* **master:** linting warnings ([ce325d1](https://github.com/iamrony777/Baileys/commit/ce325d11828b6f32584b39e7e427aa47b0ee555d))
+* **master:** New profile update/removal endpoint (inspired by [#1048](https://github.com/iamrony777/Baileys/issues/1048)) ([70f0321](https://github.com/iamrony777/Baileys/commit/70f03213810fb821c05ea5f024f6f270babe4df5))
+* **master:** nightly builds ([2ef59bf](https://github.com/iamrony777/Baileys/commit/2ef59bf924dde792c40106e4253357f5b810f25b))
+* **master:** prevent detection ([e91f9e0](https://github.com/iamrony777/Baileys/commit/e91f9e05c5493f410882aa2dcb7396a945725691))
+* **master:** Small fix to the profile picture endpoints ([47b2f6d](https://github.com/iamrony777/Baileys/commit/47b2f6dd413e649eaf62b29ef7a0c69ed370b436))
+* **master:** update linting workflow to node 20 (current LTS) ([703933f](https://github.com/iamrony777/Baileys/commit/703933f44ce1b0d0301fc51392f9ae5c7e548b08))
+* **master:** yarn lock and axios error + move to WhiskeySockets libsignal ([c8aab8d](https://github.com/iamrony777/Baileys/commit/c8aab8d03f7e5823b57b7168cca593f11191aa05))
+* messaging-history.set event not emitting syncType and progress / add PDO request id ([#1042](https://github.com/iamrony777/Baileys/issues/1042)) ([fda2689](https://github.com/iamrony777/Baileys/commit/fda268916927c81e407b4f5d2830b63ed8c23b30))
 * **missing messages:** revert to normal ([#732](https://github.com/iamrony777/Baileys/issues/732)) ([9d2f9ed](https://github.com/iamrony777/Baileys/commit/9d2f9ed4e3ab4ddce8d754b23ab7a5495e4470f6))
 * **missing-messages:** linting and bug ([c264633](https://github.com/iamrony777/Baileys/commit/c264633291b16ffd897e9a98d29d3bf6a11502ff))
 * **missing-messages:** linting fix ([9d3dcfd](https://github.com/iamrony777/Baileys/commit/9d3dcfd08b161983f2b7654eaccbf93f2362b442))
 * old_version in mobile connection ([#722](https://github.com/iamrony777/Baileys/issues/722)) ([495bb67](https://github.com/iamrony777/Baileys/commit/495bb6775af76a5f214b2fa9063079d5d139cd0a))
+* profilePictureUrl ([#901](https://github.com/iamrony777/Baileys/issues/901)) ([5bdfc63](https://github.com/iamrony777/Baileys/commit/5bdfc631058fdb0f7a83b6865339b134a3f62453))
 * quick test to diagnose working dir issue ([b5e5239](https://github.com/iamrony777/Baileys/commit/b5e5239c94b838e72a2e0f5fa6c613a4306ba66f))
+* remove 'none' from updateGroupsAddPrivacy ([#966](https://github.com/iamrony777/Baileys/issues/966)) ([ffafc16](https://github.com/iamrony777/Baileys/commit/ffafc167fb667713229467d2ad62a9444fddc6e3))
 * **retry:** final commit: linting ([767af0b](https://github.com/iamrony777/Baileys/commit/767af0b688a21a5737ef745997f8687870dc1294))
 
 
 ### Features
 
+* add event that handles join approval requests ([#802](https://github.com/iamrony777/Baileys/issues/802)) ([ffec4af](https://github.com/iamrony777/Baileys/commit/ffec4af454b7eaef5af0f9cde03faa3664969b78))
+* add label feature ([#955](https://github.com/iamrony777/Baileys/issues/955)) ([6ff9455](https://github.com/iamrony777/Baileys/commit/6ff945502d9e78c42a1d05fca79f951e81b946df))
 * Add max msg retry count ([#572](https://github.com/iamrony777/Baileys/issues/572)) ([18990f8](https://github.com/iamrony777/Baileys/commit/18990f874f9faf2423c9f6a024bfc7d72f8b4c9e))
 * add option for Windows browser ([#303](https://github.com/iamrony777/Baileys/issues/303)) ([3fc5d4b](https://github.com/iamrony777/Baileys/commit/3fc5d4b8036cc72e672e646399bcf9f6bd72ccc9))
 * add support to ptvMessage in sendMessage method ([#738](https://github.com/iamrony777/Baileys/issues/738)) ([111601b](https://github.com/iamrony777/Baileys/commit/111601bc732176ddb1bcb8feeee018e7d46d2e5a))
+* **add-logger:** initial commit ([#777](https://github.com/iamrony777/Baileys/issues/777)) ([7d80bf0](https://github.com/iamrony777/Baileys/commit/7d80bf0ea25eb3cbbfa48331eed38399e4506b54))
+* **add-routing-info:** initial commit ([#773](https://github.com/iamrony777/Baileys/issues/773)) ([0eaa5af](https://github.com/iamrony777/Baileys/commit/0eaa5af909d90df935f79a4cc96740b2e89ff518))
 * auto version hash ([#290](https://github.com/iamrony777/Baileys/issues/290)) ([6b4d917](https://github.com/iamrony777/Baileys/commit/6b4d91737f375070ae4869b7ec43d7728d48d2ee))
+* emit WAMessageStubType.GROUP_CHANGE_DESCRIPTION event ([#967](https://github.com/iamrony777/Baileys/issues/967)) ([c32ea03](https://github.com/iamrony777/Baileys/commit/c32ea03de605e52c8b6e26655db38db589161a97))
+* **feature/group-invite-v4:** initial/final commit ([#958](https://github.com/iamrony777/Baileys/issues/958)) ([7c9f2eb](https://github.com/iamrony777/Baileys/commit/7c9f2ebd46194ffff77bb56b759452478fe02e40))
+* **feature/poll-v3:** initial/final commit ([#957](https://github.com/iamrony777/Baileys/issues/957)) ([e915010](https://github.com/iamrony777/Baileys/commit/e91501026c34223a2a8c6b39cf59f8dd6bd075e8))
 * **fix-workflow:** push to the 2 npm packages at the same time ([#746](https://github.com/iamrony777/Baileys/issues/746)) ([098908d](https://github.com/iamrony777/Baileys/commit/098908d05b59126cdce5fadc07e370f85cde310a))
 * If need approval to join the group in groupMetadata ([#533](https://github.com/iamrony777/Baileys/issues/533)) ([c41be3a](https://github.com/iamrony777/Baileys/commit/c41be3ac4fd90bf1ce748b7905e74600cef8a1d1))
 * memberAddMode and joinApprovalMode in groups.update ([#532](https://github.com/iamrony777/Baileys/issues/532)) ([3efd3e0](https://github.com/iamrony777/Baileys/commit/3efd3e00ca64b795a6e1f7581aaf260880a09202))
 * Set in group settings memberAddMode and joinApprovalMode ([#534](https://github.com/iamrony777/Baileys/issues/534)) ([408c007](https://github.com/iamrony777/Baileys/commit/408c0070ba85d33a05cfeab66f447464b2bbf36f))
+
+
+### Reverts
+
+* Revert "Update module to latest version  (#926)" (#947) ([1885157](https://github.com/iamrony777/Baileys/commit/188515791d8337580c182e890290a34019b13438)), closes [#926](https://github.com/iamrony777/Baileys/issues/926) [#947](https://github.com/iamrony777/Baileys/issues/947)
+* Revert "Update module to latest version  (#926)" ([4594997](https://github.com/iamrony777/Baileys/commit/45949972e173741d5e0b82bc44317e620b861460)), closes [#926](https://github.com/iamrony777/Baileys/issues/926)
+* Revert "fix: inefficient method of extracting url from text (#741)" (#748) ([d91967a](https://github.com/iamrony777/Baileys/commit/d91967aa1c025f96336dbe8e390ae38ed6845566)), closes [#741](https://github.com/iamrony777/Baileys/issues/741) [#748](https://github.com/iamrony777/Baileys/issues/748) [#741](https://github.com/iamrony777/Baileys/issues/741)
 
 
 
@@ -599,7 +636,6 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/iamrony777/Baileys/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/iamrony777/Baileys/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/iamrony777/Baileys/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-## 6.7.9 (2024-10-22)
 
 
 

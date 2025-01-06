@@ -82,7 +82,7 @@ export const makeNoiseHandler = ({
 	}
 
 	const data = Buffer.from(NOISE_MODE)
-	let hash = Buffer.from(data.byteLength === 32 ? data : sha256(data))
+	let hash = Buffer.from(data.byteLength === 32 ? data : sha256(data)) as Buffer<ArrayBufferLike>
 	let salt = hash
 	let encKey = hash
 	let decKey = hash
