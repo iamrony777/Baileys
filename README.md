@@ -9,6 +9,9 @@ The original repository was removed by its author and later taken over by [Whisk
 [![NPM Version](https://img.shields.io/npm/v/%40iamrony777%2Fbaileys?style=for-the-badge&logo=npm&label=BAILEYS&color=%2325D366)
 ](https://www.npmjs.com/package/@iamrony777/baileys)
 
+[![Static Badge](https://img.shields.io/badge/READ-DOCS-d052d9?style=for-the-badge&logo=readthedocs&labelColor=white)](https://ronit.is-a.dev/Baileys/)
+
+
 ## Installation
 
 Check `.env.example` first to setup databases
