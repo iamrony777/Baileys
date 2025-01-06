@@ -6,7 +6,7 @@ The original repository was removed by its author and later taken over by [Whisk
 
 **If you encounter any issues after using this fork or any part of it, I recommend creating a new issue here rather than on WhiskeySocket's Discord server. AND EXPECT BUGS, LOTS OF BUGS (THIS IS UNSTABLE ASF)**
 
-[NPM Package](https://www.npmjs.com/package/@iamrony777/baileys)
+![NPM Version](https://img.shields.io/npm/v/%40iamrony777%2Fbaileys?style=for-the-badge&logo=npm&label=BAILEYS&color=%2325D366&link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40iamrony777%2Fbaileys)
 
 ## Installation
 
