@@ -192,6 +192,10 @@ const startSock = async () => {
 						startSock()
 					} else {
 						console.log('Connection closed. You are logged out.')
+						await removeCreds()
+						client.destroy()
+						await mongoClient.close()
+						process.exit(0)
 					}
 				}
 

@@ -93,13 +93,15 @@ export const encodeBigEndian = (e: number, t = 4) => {
 }
 
 export const toNumber = (t: Long | number | null | undefined): number => {
-    if (typeof t === 'object' && t) {
-        if ('toNumber' in t && typeof t.toNumber === 'function') {
-            return t.toNumber()
-        }
-        return (t as Long).low
-    }
-    return t || 0
+	if (typeof t === 'object' && t) {
+		if ('toNumber' in t && typeof t.toNumber === 'function') {
+			return t.toNumber()
+		}
+
+		return t.low
+	}
+
+	return t || 0
 }
 
 /** unix timestamp of a date in seconds */

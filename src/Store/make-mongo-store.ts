@@ -1,9 +1,9 @@
 import type { Comparable } from '@adiwajshing/keyed-db/lib/Types'
+import { calculateObjectSize } from 'bson'
 import { CronJob } from 'cron'
 import moment from 'moment-timezone'
 import type { Db } from 'mongodb'
 import type { Logger } from 'pino'
-import { calculateObjectSize } from 'bson'
 import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
@@ -20,13 +20,17 @@ import type {
 	WAMessageKey
 } from '../Types'
 import type { Label } from '../Types/Label'
-import { type ChatLabelAssociation, type LabelAssociation, LabelAssociationType, type MessageLabelAssociation } from '../Types/LabelAssociation'
+import {
+	type ChatLabelAssociation,
+	type LabelAssociation,
+	LabelAssociationType,
+	type MessageLabelAssociation
+} from '../Types/LabelAssociation'
 import { md5, toNumber, updateMessageWithReaction, updateMessageWithReceipt } from '../Utils'
 import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
 import { ObjectRepository } from './object-repository'
- 
- 
+
 type WASocket = ReturnType<typeof makeMDSocket>
 
 export const waChatKey = (pin: boolean) => ({
@@ -215,6 +219,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 			}
 		}
 	}
+
 	const chats = db.collection<Chat>('chats')
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } = {}
 	const contacts = db.collection<Contact>('contacts')
@@ -292,19 +297,23 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 					logger.debug('no chats added')
 				}
 
-				const oldContacts = await contacts.bulkWrite(
-					newContacts.map(contact => {
-						return {
-							insertOne: {
-								document: contact
+				if (newContacts.length) {
+					const oldContacts = await contacts.bulkWrite(
+						newContacts.map(contact => {
+							return {
+								insertOne: {
+									document: contact
+								}
 							}
-						}
-					})
-				)
-				logger.debug({ insertedContacts: oldContacts.insertedCount }, 'synced contacts')
+						})
+					)
+					logger.debug({ insertedContacts: oldContacts.insertedCount }, 'synced contacts')
 
-				if (!oldContacts.insertedCount) {
-					throw new Error('no contacts added')
+					if (!oldContacts.insertedCount) {
+						throw new Error('no contacts added')
+					}
+				} else {
+					logger.debug('no contacts to sync')
 				}
 
 				for (const msg of newMessages) {
@@ -327,7 +336,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		)
 
 		ev.on('contacts.upsert', async Contacts => {
-			if (!Contacts || !Contacts.length) {
+			if (!Contacts?.length) {
 				logger?.debug('no contacts to upsert')
 				return
 			}
@@ -369,6 +378,11 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		})
 
 		ev.on('chats.upsert', async newChats => {
+			if (!newChats || !newChats.length) {
+				logger.debug('no chats to upsert')
+				return
+			}
+
 			await chats.bulkWrite(
 				newChats.map(chat => {
 					return {
@@ -384,7 +398,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 
 		ev.on('chats.update', async updates => {
 			// try {
-			if (!updates || !updates.length) {
+			if (!updates?.length) {
 				logger.debug('no chats to update')
 				return
 			}
@@ -489,28 +503,22 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 										unreadCount: 1
 									}
 								])
-								} else {
-									chat.messages ? chat.messages.push({ message: msg }) : (chat.messages = [{ message: msg }])
-									const sizeBytes = approximateDocumentSizeBytes(chat)
-									if (sizeBytes >= MAX_BSON_DOCUMENT_SIZE_BYTES) {
-										// Revert the push to avoid persisting an oversized document
-										chat.messages?.pop()
-										logger?.error(
-											{ jid, sizeBytes },
-											'refusing to update chat; document would exceed MongoDB 16MB limit'
-										)
-										continue
-									}
-
-									if (sizeBytes >= WARN_BSON_DOCUMENT_SIZE_BYTES) {
-										logger?.warn(
-											{ jid, sizeBytes },
-											'chat document size approaching MongoDB 16MB limit'
-										)
-									}
-
-									await chats.updateOne({ id: jid }, { $set: chat }, { upsert: true })
+							} else {
+								chat.messages ? chat.messages.push({ message: msg }) : (chat.messages = [{ message: msg }])
+								const sizeBytes = approximateDocumentSizeBytes(chat)
+								if (sizeBytes >= MAX_BSON_DOCUMENT_SIZE_BYTES) {
+									// Revert the push to avoid persisting an oversized document
+									chat.messages?.pop()
+									logger?.error({ jid, sizeBytes }, 'refusing to update chat; document would exceed MongoDB 16MB limit')
+									continue
 								}
+
+								if (sizeBytes >= WARN_BSON_DOCUMENT_SIZE_BYTES) {
+									logger?.warn({ jid, sizeBytes }, 'chat document size approaching MongoDB 16MB limit')
+								}
+
+								await chats.updateOne({ id: jid }, { $set: chat }, { upsert: true })
+							}
 						}
 					}
 
@@ -568,12 +576,12 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 				switch (action) {
 					case 'add':
 						metadata.participants.push(
-							...participants.map(p => ({
+							...(participants.map(p => ({
 								...p,
 								id: p.id,
 								isAdmin: false,
 								isSuperAdmin: false
-							})) as GroupParticipant[]
+							})) as GroupParticipant[])
 						)
 						break
 					case 'demote':
@@ -727,7 +735,9 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		 * @returns Label IDs
 		 **/
 		getMessageLabels: async (messageId: string) => {
-			const associations = labelAssociations.find((la: MessageLabelAssociation | ChatLabelAssociation) => 'messageId' in la ? la.messageId === messageId : la.chatId === messageId)
+			const associations = labelAssociations.find((la: MessageLabelAssociation | ChatLabelAssociation) =>
+				'messageId' in la ? la.messageId === messageId : la.chatId === messageId
+			)
 
 			return associations?.map(({ labelId }) => labelId)
 		},
@@ -746,7 +756,10 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		mostRecentMessage: async (jid: string) => {
 			const message: WAMessage | proto.IWebMessageInfo | undefined =
 				messages[jid]?.array.slice(-1)[0] ||
-				(await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0]?.message as WAMessage | proto.IWebMessageInfo | undefined ||
+				((await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0]?.message as
+					| WAMessage
+					| proto.IWebMessageInfo
+					| undefined) ||
 				undefined
 			return message as WAMessage | undefined
 		},

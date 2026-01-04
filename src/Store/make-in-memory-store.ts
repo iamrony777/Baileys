@@ -61,17 +61,14 @@ export default (config: BaileysInMemoryStoreConfig) => {
 	const labelAssociationKey = config.labelAssociationKey || waLabelAssociationKey
 	const logger = DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'in-mem-store' })
 
-	const chats = new KeyedDB(chatKey, c => c.id!) as KeyedDB<Chat, string>
+	const chats = new KeyedDB(chatKey, c => c.id!)
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } = {}
 	const contacts: { [_: string]: Contact } = {}
 	const groupMetadata: { [_: string]: GroupMetadata } = {}
 	const presences: { [id: string]: { [participant: string]: PresenceData } } = {}
 	const state: ConnectionState = { connection: 'close' }
 	const labels = new ObjectRepository<Label>()
-	const labelAssociations = new KeyedDB(labelAssociationKey, labelAssociationKey.key) as KeyedDB<
-		LabelAssociation,
-		string
-	>
+	const labelAssociations = new KeyedDB(labelAssociationKey, labelAssociationKey.key)
 
 	const assertMessageList = (jid: string) => {
 		if (!messages[jid]) {

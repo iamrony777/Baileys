@@ -1179,7 +1179,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 		const encNode = getBinaryNodeChild(node, 'enc')
 		// TODO: temporary fix for crashes and issues resulting of failed msmsg decryption
-		if (encNode && encNode.attrs.type === 'msmsg') {
+		if (encNode?.attrs.type === 'msmsg') {
 			logger.debug({ key: node.attrs.key }, 'ignored msmsg')
 			await sendMessageAck(node, NACK_REASONS.MissingMessageSecret)
 			return

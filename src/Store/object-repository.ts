@@ -28,5 +28,4 @@ export class ObjectRepository<T extends object> {
 	toJSON() {
 		return this.findAll()
 	}
-
 }

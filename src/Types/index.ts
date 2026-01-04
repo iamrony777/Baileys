@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax */
 export * from './Auth'
 export * from './GroupMetadata'
 export * from './Chat'
