@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
     "experimentalDecorators": true,
-    "allowJs": false,
-    "checkJs": false,
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -32,13 +30,9 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
 
-    "sourceMap": true,
-    "inlineSources": true,
-
-    // Set `sourceRoot` to  "/" to strip the build path prefix
-    // from generated source code references.
-    // This improves issue grouping in Sentry.
-    "sourceRoot": "/"
+    // DX Boosters
+    "allowJs": false,
+    "checkJs": false,
   },
   "include": [
     "./src/**/*.ts"

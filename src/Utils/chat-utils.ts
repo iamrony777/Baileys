@@ -1,5 +1,4 @@
 import { Boom } from '@hapi/boom'
-import type { AxiosRequestConfig } from 'axios'
 import { proto } from '../../WAProto/index.js'
 import type {
 	BaileysEventEmitter,
@@ -19,14 +18,7 @@ import {
 	LabelAssociationType,
 	type MessageLabelAssociation
 } from '../Types/LabelAssociation'
-import {
-	type BinaryNode,
-	getBinaryNodeChild,
-	getBinaryNodeChildren,
-	isJidGroup,
-	isJidUser,
-	jidNormalizedUser
-} from '../WABinary'
+import { type BinaryNode, getBinaryNodeChild, getBinaryNodeChildren, isJidGroup, jidNormalizedUser } from '../WABinary'
 import { aesDecrypt, aesEncrypt, hkdf, hmacSign } from './crypto'
 import { toNumber } from './generics'
 import type { ILogger } from './logger'
@@ -309,7 +301,7 @@ export const decodeSyncdPatch = async (
 	return result
 }
 
-export const extractSyncdPatches = async (result: BinaryNode, options: AxiosRequestConfig<{}>) => {
+export const extractSyncdPatches = async (result: BinaryNode, options: RequestInit) => {
 	const syncNode = getBinaryNodeChild(result, 'sync')
 	const collectionNodes = getBinaryNodeChildren(syncNode, 'collection')
 
@@ -361,7 +353,7 @@ export const extractSyncdPatches = async (result: BinaryNode, options: AxiosRequ
 	return final
 }
 
-export const downloadExternalBlob = async (blob: proto.IExternalBlobReference, options: AxiosRequestConfig<{}>) => {
+export const downloadExternalBlob = async (blob: proto.IExternalBlobReference, options: RequestInit) => {
 	const stream = await downloadContentFromMessage(blob, 'md-app-state', { options })
 	const bufferArray: Buffer[] = []
 	for await (const chunk of stream) {
@@ -371,7 +363,7 @@ export const downloadExternalBlob = async (blob: proto.IExternalBlobReference, o
 	return Buffer.concat(bufferArray)
 }
 
-export const downloadExternalPatch = async (blob: proto.IExternalBlobReference, options: AxiosRequestConfig<{}>) => {
+export const downloadExternalPatch = async (blob: proto.IExternalBlobReference, options: RequestInit) => {
 	const buffer = await downloadExternalBlob(blob, options)
 	const syncData = proto.SyncdMutations.decode(buffer)
 	return syncData
@@ -430,7 +422,7 @@ export const decodePatches = async (
 	syncds: proto.ISyncdPatch[],
 	initial: LTHashState,
 	getAppStateSyncKey: FetchAppStateSyncKey,
-	options: AxiosRequestConfig<{}>,
+	options: RequestInit,
 	minimumVersionNumber?: number,
 	logger?: ILogger,
 	validateMacs = true
@@ -619,6 +611,16 @@ export const chatModificationToAppPatch = (mod: ChatModification, jid: string) =
 			apiVersion: 2,
 			operation: mod.contact ? OP.SET : OP.REMOVE
 		}
+	} else if ('disableLinkPreviews' in mod) {
+		patch = {
+			syncAction: {
+				privacySettingDisableLinkPreviewsAction: mod.disableLinkPreviews || {}
+			},
+			index: ['setting_disableLinkPreviews'],
+			type: 'regular',
+			apiVersion: 8,
+			operation: OP.SET
+		}
 	} else if ('star' in mod) {
 		const key = mod.star.messages[0]!
 		patch = {
@@ -654,6 +656,22 @@ export const chatModificationToAppPatch = (mod: ChatModification, jid: string) =
 			index: ['setting_pushName'],
 			type: 'critical_block',
 			apiVersion: 1,
+			operation: OP.SET
+		}
+	} else if ('quickReply' in mod) {
+		patch = {
+			syncAction: {
+				quickReplyAction: {
+					count: 0,
+					deleted: mod.quickReply.deleted || false,
+					keywords: [],
+					message: mod.quickReply.message || '',
+					shortcut: mod.quickReply.shortcut || ''
+				}
+			},
+			index: ['quick_reply', mod.quickReply.timestamp || String(Math.floor(Date.now() / 1000))],
+			type: 'regular',
+			apiVersion: 2,
 			operation: OP.SET
 		}
 	} else if ('addLabel' in mod) {
@@ -819,7 +837,7 @@ export const processSyncAction = (
 				id: id!,
 				name: action.contactAction.fullName!,
 				lid: action.contactAction.lidJid || undefined,
-				jid: isJidUser(id) ? id : undefined
+				phoneNumber: action.contactAction.pnJid || undefined
 			}
 		])
 	} else if (action?.pushNameSetting) {
@@ -885,6 +903,47 @@ export const processSyncAction = (
 							messageId: syncAction.index[3],
 							labelId: syncAction.index[1]
 						} as MessageLabelAssociation)
+		})
+	} else if (action?.localeSetting?.locale) {
+		ev.emit('settings.update', { setting: 'locale', value: action.localeSetting.locale })
+	} else if (action?.timeFormatAction) {
+		ev.emit('settings.update', { setting: 'timeFormat', value: action.timeFormatAction })
+	} else if (action?.pnForLidChatAction) {
+		if (action.pnForLidChatAction.pnJid) {
+			ev.emit('lid-mapping.update', { lid: id!, pn: action.pnForLidChatAction.pnJid })
+		}
+	} else if (action?.privacySettingRelayAllCalls) {
+		ev.emit('settings.update', {
+			setting: 'privacySettingRelayAllCalls',
+			value: action.privacySettingRelayAllCalls
+		})
+	} else if (action?.statusPrivacy) {
+		ev.emit('settings.update', { setting: 'statusPrivacy', value: action.statusPrivacy })
+	} else if (action?.lockChatAction) {
+		ev.emit('chats.lock', { id: id!, locked: !!action.lockChatAction.locked })
+	} else if (action?.privacySettingDisableLinkPreviewsAction) {
+		ev.emit('settings.update', {
+			setting: 'disableLinkPreviews',
+			value: action.privacySettingDisableLinkPreviewsAction
+		})
+	} else if (action?.notificationActivitySettingAction?.notificationActivitySetting) {
+		ev.emit('settings.update', {
+			setting: 'notificationActivitySetting',
+			value: action.notificationActivitySettingAction.notificationActivitySetting
+		})
+	} else if (action?.lidContactAction) {
+		ev.emit('contacts.upsert', [
+			{
+				id: id!,
+				name: action.lidContactAction.fullName!,
+				lid: id!,
+				phoneNumber: undefined
+			}
+		])
+	} else if (action?.privacySettingChannelsPersonalisedRecommendationAction) {
+		ev.emit('settings.update', {
+			setting: 'channelsPersonalisedRecommendation',
+			value: action.privacySettingChannelsPersonalisedRecommendationAction
 		})
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')

@@ -4,7 +4,13 @@ import type { AuthenticationCreds } from './Auth'
 import type { WACallEvent } from './Call'
 import type { Chat, ChatUpdate, PresenceData } from './Chat'
 import type { Contact } from './Contact'
-import type { GroupMetadata, ParticipantAction, RequestJoinAction, RequestJoinMethod } from './GroupMetadata'
+import type {
+	GroupMetadata,
+	GroupParticipant,
+	ParticipantAction,
+	RequestJoinAction,
+	RequestJoinMethod
+} from './GroupMetadata'
 import type { Label } from './Label'
 import type { LabelAssociation } from './LabelAssociation'
 import type { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
@@ -23,14 +29,14 @@ export type BaileysEventMap = {
 		messages: WAMessage[]
 		isLatest?: boolean
 		progress?: number | null
-		syncType?: proto.HistorySync.HistorySyncType
+		syncType?: proto.HistorySync.HistorySyncType | null
 		peerDataRequestSessionId?: string | null
 	}
 	/** upsert chats */
 	'chats.upsert': Chat[]
 	/** update the given chats */
 	'chats.update': ChatUpdate[]
-	'chats.phoneNumberShare': { lid: string; jid: string }
+	'lid-mapping.update': { lid: string; pn: string }
 	/** delete chats with given ID */
 	'chats.delete': string[]
 	/** presence of contact in a chat updated */
@@ -56,13 +62,29 @@ export type BaileysEventMap = {
 	'groups.upsert': GroupMetadata[]
 	'groups.update': Partial<GroupMetadata>[]
 	/** apply an action to participants in a group */
-	'group-participants.update': { id: string; author: string; participants: string[]; action: ParticipantAction }
+	'group-participants.update': {
+		id: string
+		author: string
+		authorPn?: string
+		participants: GroupParticipant[]
+		action: ParticipantAction
+	}
 	'group.join-request': {
 		id: string
 		author: string
+		authorPn?: string
 		participant: string
+		participantPn?: string
 		action: RequestJoinAction
 		method: RequestJoinMethod
+	}
+	/*	update the labels assigned to a group participant */
+	'group.member-tag.update': {
+		groupId: string
+		participant: string
+		participantAlt?: string
+		label: string
+		messageTimestamp?: number
 	}
 
 	'blocklist.set': { blocklist: string[] }
@@ -82,6 +104,24 @@ export type BaileysEventMap = {
 	'newsletter.view': { id: string; server_id: string; count: number }
 	'newsletter-participants.update': { id: string; author: string; user: string; new_role: string; action: string }
 	'newsletter-settings.update': { id: string; update: any }
+
+	/** Settings and actions sync events */
+	'chats.lock': { id: string; locked: boolean }
+	'settings.update':
+		| { setting: 'unarchiveChats'; value: boolean }
+		| { setting: 'locale'; value: string }
+		| { setting: 'disableLinkPreviews'; value: proto.SyncActionValue.IPrivacySettingDisableLinkPreviewsAction }
+		| { setting: 'timeFormat'; value: proto.SyncActionValue.ITimeFormatAction }
+		| { setting: 'privacySettingRelayAllCalls'; value: proto.SyncActionValue.IPrivacySettingRelayAllCalls }
+		| { setting: 'statusPrivacy'; value: proto.SyncActionValue.IStatusPrivacyAction }
+		| {
+				setting: 'notificationActivitySetting'
+				value: proto.SyncActionValue.NotificationActivitySettingAction.NotificationActivitySetting
+		  }
+		| {
+				setting: 'channelsPersonalisedRecommendation'
+				value: proto.SyncActionValue.IPrivacySettingChannelsPersonalisedRecommendationAction
+		  }
 }
 
 export type BufferedEventData = {

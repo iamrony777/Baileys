@@ -149,6 +149,26 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 
 			return await parseGroupResult(result)
 		},
+		communityCreateGroup: async (subject: string, participants: string[], parentCommunityJid: string) => {
+			const key = generateMessageIDV2()
+			const result = await communityQuery('@g.us', 'set', [
+				{
+					tag: 'create',
+					attrs: {
+						subject,
+						key
+					},
+					content: [
+						...participants.map(jid => ({
+							tag: 'participant',
+							attrs: { jid }
+						})),
+						{ tag: 'linked_parent', attrs: { jid: parentCommunityJid } }
+					]
+				}
+			])
+			return await parseGroupResult(result)
+		},
 		communityLeave: async (id: string) => {
 			await communityQuery('@g.us', 'set', [
 				{
@@ -166,6 +186,68 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 					content: Buffer.from(subject, 'utf-8')
 				}
 			])
+		},
+		communityLinkGroup: async (groupJid: string, parentCommunityJid: string) => {
+			await communityQuery(parentCommunityJid, 'set', [
+				{
+					tag: 'links',
+					attrs: {},
+					content: [
+						{
+							tag: 'link',
+							attrs: { link_type: 'sub_group' },
+							content: [{ tag: 'group', attrs: { jid: groupJid } }]
+						}
+					]
+				}
+			])
+		},
+		communityUnlinkGroup: async (groupJid: string, parentCommunityJid: string) => {
+			await communityQuery(parentCommunityJid, 'set', [
+				{
+					tag: 'unlink',
+					attrs: { unlink_type: 'sub_group' },
+					content: [{ tag: 'group', attrs: { jid: groupJid } }]
+				}
+			])
+		},
+		communityFetchLinkedGroups: async (jid: string) => {
+			let communityJid = jid
+			let isCommunity = false
+
+			// Try to determine if it is a subgroup or a community
+			const metadata = await sock.groupMetadata(jid)
+			if (metadata.linkedParent) {
+				// It is a subgroup, get the community jid
+				communityJid = metadata.linkedParent
+			} else {
+				// It is a community
+				isCommunity = true
+			}
+
+			// Fetch all subgroups of the community
+			const result = await communityQuery(communityJid, 'get', [{ tag: 'sub_groups', attrs: {} }])
+
+			const linkedGroupsData = []
+			const subGroupsNode = getBinaryNodeChild(result, 'sub_groups')
+			if (subGroupsNode) {
+				const groupNodes = getBinaryNodeChildren(subGroupsNode, 'group')
+				for (const groupNode of groupNodes) {
+					linkedGroupsData.push({
+						id: groupNode.attrs.id ? jidEncode(groupNode.attrs.id, 'g.us') : undefined,
+						subject: groupNode.attrs.subject || '',
+						creation: groupNode.attrs.creation ? Number(groupNode.attrs.creation) : undefined,
+						owner: groupNode.attrs.creator ? jidNormalizedUser(groupNode.attrs.creator) : undefined,
+						size: groupNode.attrs.size ? Number(groupNode.attrs.size) : undefined
+					})
+				}
+			}
+
+			return {
+				communityJid,
+				isCommunity,
+				linkedGroups: linkedGroupsData
+			}
 		},
 		communityRequestParticipantsList: async (jid: string) => {
 			const result = await communityQuery(jid, 'get', [
@@ -206,7 +288,7 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 			const result = await communityQuery(jid, 'set', [
 				{
 					tag: action,
-					attrs: {},
+					attrs: action === 'remove' ? { linked_groups: 'true' } : {},
 					content: participants.map(jid => ({
 						tag: 'participant',
 						attrs: { jid }
@@ -308,10 +390,10 @@ export const makeCommunitiesSocket = (config: SocketConfig) => {
 							remoteJid: inviteMessage.groupJid,
 							id: generateMessageIDV2(sock.user?.id),
 							fromMe: false,
-							participant: key.remoteJid
+							participant: key.remoteJid // TODO: investigate if this makes any sense at all
 						},
 						messageStubType: WAMessageStubType.GROUP_PARTICIPANT_ADD,
-						messageStubParameters: [authState.creds.me!.id],
+						messageStubParameters: [JSON.stringify(authState.creds.me)],
 						participant: key.remoteJid,
 						messageTimestamp: unixTimestampSeconds()
 					},
@@ -383,6 +465,7 @@ export const extractCommunityMetadata = (result: BinaryNode) => {
 		memberAddMode,
 		participants: getBinaryNodeChildren(community, 'participant').map(({ attrs }) => {
 			return {
+				// TODO: IMPLEMENT THE PN/LID FIELDS HERE!!
 				id: attrs.jid!,
 				admin: (attrs.type || null) as GroupParticipant['admin']
 			}

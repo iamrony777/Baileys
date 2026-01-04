@@ -1,15 +1,20 @@
 import { Boom } from '@hapi/boom'
-import axios from 'axios'
 import { randomBytes } from 'crypto'
 import { promises as fs } from 'fs'
 import { type Transform } from 'stream'
 import { proto } from '../../WAProto/index.js'
-import { MEDIA_KEYS, URL_REGEX, WA_DEFAULT_EPHEMERAL } from '../Defaults'
+import {
+	CALL_AUDIO_PREFIX,
+	CALL_VIDEO_PREFIX,
+	MEDIA_KEYS,
+	type MediaType,
+	URL_REGEX,
+	WA_DEFAULT_EPHEMERAL
+} from '../Defaults'
 import type {
 	AnyMediaMessageContent,
 	AnyMessageContent,
 	DownloadableMessage,
-	MediaType,
 	MessageContentGenerationOptions,
 	MessageGenerationOptions,
 	MessageGenerationOptionsFromContent,
@@ -18,6 +23,7 @@ import type {
 	WAMediaUpload,
 	WAMessage,
 	WAMessageContent,
+	WAMessageKey,
 	WATextMessage
 } from '../Types'
 import { WAMessageStatus, WAProto } from '../Types'
@@ -146,11 +152,11 @@ export const prepareWAMessageMedia = async (
 	}
 
 	if (cacheableKey) {
-		const mediaBuff = options.mediaCache!.get<Buffer>(cacheableKey)
+		const mediaBuff = await options.mediaCache!.get<Buffer>(cacheableKey)
 		if (mediaBuff) {
 			logger?.debug({ cacheableKey }, 'got media cache hit')
 
-			const obj = WAProto.Message.decode(mediaBuff)
+			const obj = proto.Message.decode(mediaBuff)
 			const key = `${mediaType}Message`
 
 			Object.assign(obj[key as keyof proto.Message]!, { ...uploadData, media: undefined })
@@ -194,9 +200,13 @@ export const prepareWAMessageMedia = async (
 			delete obj.videoMessage
 		}
 
+		if (obj.stickerMessage) {
+			obj.stickerMessage.stickerSentTs = Date.now()
+		}
+
 		if (cacheableKey) {
 			logger?.debug({ cacheableKey }, 'set cache')
-			options.mediaCache!.set(cacheableKey, WAProto.Message.encode(obj).finish())
+			await options.mediaCache!.set(cacheableKey, WAProto.Message.encode(obj).finish())
 		}
 
 		return obj
@@ -289,7 +299,7 @@ export const prepareWAMessageMedia = async (
 			mediaKeyTimestamp: unixTimestampSeconds(),
 			...uploadData,
 			media: undefined
-		})
+		} as any)
 	})
 
 	if (uploadData.ptv) {
@@ -299,7 +309,7 @@ export const prepareWAMessageMedia = async (
 
 	if (cacheableKey) {
 		logger?.debug({ cacheableKey }, 'set cache')
-		options.mediaCache!.set(cacheableKey, WAProto.Message.encode(obj).finish())
+		await options.mediaCache!.set(cacheableKey, WAProto.Message.encode(obj).finish())
 	}
 
 	return obj
@@ -404,18 +414,18 @@ export const generateWAMessageContent = async (
 		}
 
 		if (contactLen === 1) {
-			m.contactMessage = WAProto.Message.ContactMessage.fromObject(message.contacts.contacts[0]!)
+			m.contactMessage = WAProto.Message.ContactMessage.create(message.contacts.contacts[0])
 		} else {
-			m.contactsArrayMessage = WAProto.Message.ContactsArrayMessage.fromObject(message.contacts)
+			m.contactsArrayMessage = WAProto.Message.ContactsArrayMessage.create(message.contacts)
 		}
 	} else if ('location' in message) {
-		m.locationMessage = WAProto.Message.LocationMessage.fromObject(message.location)
+		m.locationMessage = WAProto.Message.LocationMessage.create(message.location)
 	} else if ('react' in message) {
 		if (!message.react.senderTimestampMs) {
 			message.react.senderTimestampMs = Date.now()
 		}
 
-		m.reactionMessage = WAProto.Message.ReactionMessage.fromObject(message.react)
+		m.reactionMessage = WAProto.Message.ReactionMessage.create(message.react)
 	} else if ('delete' in message) {
 		m.protocolMessage = {
 			key: message.delete,
@@ -444,9 +454,10 @@ export const generateWAMessageContent = async (
 		if (options.getProfilePicUrl) {
 			const pfpUrl = await options.getProfilePicUrl(message.groupInvite.jid, 'preview')
 			if (pfpUrl) {
-				const resp = await axios.get(pfpUrl, { responseType: 'arraybuffer' })
-				if (resp.status === 200) {
-					m.groupInviteMessage.jpegThumbnail = resp.data
+				const resp = await fetch(pfpUrl, { method: 'GET', dispatcher: options?.options?.dispatcher })
+				if (resp.ok) {
+					const buf = Buffer.from(await resp.arrayBuffer())
+					m.groupInviteMessage.jpegThumbnail = buf
 				}
 			}
 		}
@@ -481,7 +492,7 @@ export const generateWAMessageContent = async (
 		m.ptvMessage = videoMessage
 	} else if ('product' in message) {
 		const { imageMessage } = await prepareWAMessageMedia({ image: message.product.productImage }, options)
-		m.productMessage = WAProto.Message.ProductMessage.fromObject({
+		m.productMessage = WAProto.Message.ProductMessage.create({
 			...message,
 			product: {
 				...message.product,
@@ -490,6 +501,28 @@ export const generateWAMessageContent = async (
 		})
 	} else if ('listReply' in message) {
 		m.listResponseMessage = { ...message.listReply }
+	} else if ('event' in message) {
+		m.eventMessage = {}
+		const startTime = Math.floor(message.event.startDate.getTime() / 1000)
+
+		if (message.event.call && options.getCallLink) {
+			const token = await options.getCallLink(message.event.call, { startTime })
+			m.eventMessage.joinLink = (message.event.call === 'audio' ? CALL_AUDIO_PREFIX : CALL_VIDEO_PREFIX) + token
+		}
+
+		m.messageContextInfo = {
+			// encKey
+			messageSecret: message.event.messageSecret || randomBytes(32)
+		}
+
+		m.eventMessage.name = message.event.name
+		m.eventMessage.description = message.event.description
+		m.eventMessage.startTime = startTime
+		m.eventMessage.endTime = message.event.endDate ? message.event.endDate.getTime() / 1000 : undefined
+		m.eventMessage.isCanceled = message.event.isCancelled ?? false
+		m.eventMessage.extraGuestsAllowed = message.event.extraGuestsAllowed
+		m.eventMessage.isScheduleCall = message.event.isScheduleCall ?? false
+		m.eventMessage.location = message.event.location
 	} else if ('poll' in message) {
 		message.poll.selectableCount ||= 0
 		message.poll.toAnnouncementGroup ||= false
@@ -533,6 +566,16 @@ export const generateWAMessageContent = async (
 		}
 	} else if ('requestPhoneNumber' in message) {
 		m.requestPhoneNumberMessage = {}
+	} else if ('limitSharing' in message) {
+		m.protocolMessage = {
+			type: proto.Message.ProtocolMessage.Type.LIMIT_SHARING,
+			limitSharing: {
+				sharingLimited: message.limitSharing === true,
+				trigger: 1,
+				limitSharingSettingTimestamp: Date.now(),
+				initiatedByMe: true
+			}
+		}
 	} else {
 		m = await prepareWAMessageMedia(message, options)
 	}
@@ -574,7 +617,7 @@ export const generateWAMessageContent = async (
 		}
 	}
 
-	return WAProto.Message.fromObject(m)
+	return WAProto.Message.create(m)
 }
 
 export const generateWAMessageFromContent = (
@@ -595,13 +638,13 @@ export const generateWAMessageFromContent = (
 
 	if (quoted && !isJidNewsletter(jid)) {
 		const participant = quoted.key.fromMe
-			? userJid
+			? userJid // TODO: Add support for LIDs
 			: quoted.participant || quoted.key.participant || quoted.key.remoteJid
 
 		let quotedMsg = normalizeMessageContent(quoted.message)!
 		const msgType = getContentType(quotedMsg)!
 		// strip any redundant properties
-		quotedMsg = proto.Message.fromObject({ [msgType]: quotedMsg[msgType] })
+		quotedMsg = proto.Message.create({ [msgType]: quotedMsg[msgType] })
 
 		const quotedContent = quotedMsg[msgType]
 		if (typeof quotedContent === 'object' && quotedContent && 'contextInfo' in quotedContent) {
@@ -644,7 +687,7 @@ export const generateWAMessageFromContent = (
 		}
 	}
 
-	message = WAProto.Message.fromObject(message)
+	message = WAProto.Message.create(message)
 
 	const messageJSON = {
 		key: {
@@ -655,10 +698,10 @@ export const generateWAMessageFromContent = (
 		message: message,
 		messageTimestamp: timestamp,
 		messageStubParameters: [],
-		participant: isJidGroup(jid) || isJidStatusBroadcast(jid) ? userJid : undefined,
+		participant: isJidGroup(jid) || isJidStatusBroadcast(jid) ? userJid : undefined, // TODO: Add support for LIDs
 		status: WAMessageStatus.PENDING
 	}
-	return WAProto.WebMessageInfo.fromObject(messageJSON)
+	return WAProto.WebMessageInfo.fromObject(messageJSON) as WAMessage
 }
 
 export const generateWAMessage = async (jid: string, content: AnyMessageContent, options: MessageGenerationOptions) => {
@@ -805,6 +848,19 @@ export const updateMessageWithPollUpdate = (msg: Pick<WAMessage, 'pollUpdates'>,
 	msg.pollUpdates = reactions
 }
 
+/** Update the message with a new event response */
+export const updateMessageWithEventResponse = (
+	msg: Pick<WAMessage, 'eventResponses'>,
+	update: proto.IEventResponse
+) => {
+	const authorID = getKeyAuthor(update.eventResponseMessageKey)
+
+	const responses = (msg.eventResponses || []).filter(r => getKeyAuthor(r.eventResponseMessageKey) !== authorID)
+	responses.push(update)
+
+	msg.eventResponses = responses
+}
+
 type VoteAggregation = {
 	name: string
 	voters: string[]
@@ -861,8 +917,43 @@ export function getAggregateVotesInPollMessage(
 	return Object.values(voteHashMap)
 }
 
+type ResponseAggregation = {
+	response: string
+	responders: string[]
+}
+
+/**
+ * Aggregates all event responses in an event message.
+ * @param msg the event creation message
+ * @param meId your jid
+ * @returns A list of response types & their responders
+ */
+export function getAggregateResponsesInEventMessage(
+	{ eventResponses }: Pick<WAMessage, 'eventResponses'>,
+	meId?: string
+) {
+	const responseTypes = ['GOING', 'NOT_GOING', 'MAYBE']
+	const responseMap: { [_: string]: ResponseAggregation } = {}
+
+	for (const type of responseTypes) {
+		responseMap[type] = {
+			response: type,
+			responders: []
+		}
+	}
+
+	for (const update of eventResponses || []) {
+		const responseType = (update as any).eventResponse || 'UNKNOWN'
+		if (responseType !== 'UNKNOWN' && responseMap[responseType]) {
+			responseMap[responseType].responders.push(getKeyAuthor(update.eventResponseMessageKey, meId))
+		}
+	}
+
+	return Object.values(responseMap)
+}
+
 /** Given a list of message keys, aggregates them by chat & sender. Useful for sending read receipts in bulk */
-export const aggregateMessageKeysNotFromMe = (keys: proto.IMessageKey[]) => {
+export const aggregateMessageKeysNotFromMe = (keys: WAMessageKey[]) => {
 	const keyMap: { [id: string]: { jid: string; participant: string | undefined; messageIds: string[] } } = {}
 	for (const { remoteJid, id, participant, fromMe } of keys) {
 		if (!fromMe) {
@@ -901,8 +992,8 @@ export const downloadMediaMessage = async <Type extends 'buffer' | 'stream'>(
 	const result = await downloadMsg().catch(async error => {
 		if (
 			ctx &&
-			axios.isAxiosError(error) && // check if the message requires a reupload
-			REUPLOAD_REQUIRED_STATUS.includes(error.response?.status!)
+			typeof error?.status === 'number' && // treat errors with status as HTTP failures requiring reupload
+			REUPLOAD_REQUIRED_STATUS.includes(error.status as number)
 		) {
 			ctx.logger.info({ key: message.key }, 'sending reupload media request...')
 			// request reupload

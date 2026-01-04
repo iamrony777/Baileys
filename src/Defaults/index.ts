@@ -1,18 +1,24 @@
 import { proto } from '../../WAProto/index.js'
 import { makeLibSignalRepository } from '../Signal/libsignal'
-import type { AuthenticationState, MediaType, SocketConfig, WAVersion } from '../Types'
-import { Browsers } from '../Utils'
+import type { AuthenticationState, SocketConfig, WAVersion } from '../Types'
+import { Browsers } from '../Utils/browser-utils'
 import logger from '../Utils/logger'
-import defaultVersion from './baileys-version.json' with { type: 'json' }
 
-const { version } = defaultVersion
+const version = [2, 3000, 1027934701]
 
 export const UNAUTHORIZED_CODES = [401, 403, 419]
 
 export const DEFAULT_ORIGIN = 'https://web.whatsapp.com'
+export const CALL_VIDEO_PREFIX = 'https://call.whatsapp.com/video/'
+export const CALL_AUDIO_PREFIX = 'https://call.whatsapp.com/voice/'
 export const DEF_CALLBACK_PREFIX = 'CB:'
 export const DEF_TAG_PREFIX = 'TAG:'
 export const PHONE_CONNECTION_CB = 'CB:Pong'
+
+export const WA_ADV_ACCOUNT_SIG_PREFIX = Buffer.from([6, 0])
+export const WA_ADV_DEVICE_SIG_PREFIX = Buffer.from([6, 1])
+export const WA_ADV_HOSTED_ACCOUNT_SIG_PREFIX = Buffer.from([6, 5])
+export const WA_ADV_HOSTED_DEVICE_SIG_PREFIX = Buffer.from([6, 6])
 
 export const WA_DEFAULT_EPHEMERAL = 7 * 24 * 60 * 60
 
@@ -23,21 +29,24 @@ export const NOISE_WA_HEADER = Buffer.from([87, 65, 6, DICT_VERSION]) // last is
 /** from: https://stackoverflow.com/questions/3809401/what-is-a-good-regular-expression-to-match-a-url */
 export const URL_REGEX = /https:\/\/(?![^:@\/\s]+:[^:@\/\s]+@)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?/g
 
+// TODO: Add WA root CA
 export const WA_CERT_DETAILS = {
 	SERIAL: 0
 }
 
 export const PROCESSABLE_HISTORY_TYPES = [
-	proto.Message.HistorySyncNotification.HistorySyncType.INITIAL_BOOTSTRAP,
-	proto.Message.HistorySyncNotification.HistorySyncType.PUSH_NAME,
-	proto.Message.HistorySyncNotification.HistorySyncType.RECENT,
-	proto.Message.HistorySyncNotification.HistorySyncType.FULL,
-	proto.Message.HistorySyncNotification.HistorySyncType.ON_DEMAND
+	proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP,
+	proto.HistorySync.HistorySyncType.PUSH_NAME,
+	proto.HistorySync.HistorySyncType.RECENT,
+	proto.HistorySync.HistorySyncType.FULL,
+	proto.HistorySync.HistorySyncType.ON_DEMAND,
+	proto.HistorySync.HistorySyncType.NON_BLOCKING_DATA,
+	proto.HistorySync.HistorySyncType.INITIAL_STATUS_V3
 ]
 
 export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	version: version as WAVersion,
-	browser: Browsers.ubuntu('Chrome'),
+	browser: Browsers.macOS('Chrome'),
 	waWebSocketUrl: 'wss://web.whatsapp.com/ws/chat',
 	connectTimeoutMs: 20_000,
 	keepAliveIntervalMs: 30_000,
@@ -50,13 +59,15 @@ export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	fireInitQueries: true,
 	auth: undefined as unknown as AuthenticationState,
 	markOnlineOnConnect: true,
-	syncFullHistory: false,
+	syncFullHistory: true,
 	patchMessageBeforeSending: msg => msg,
 	shouldSyncHistoryMessage: () => true,
 	shouldIgnoreJid: () => false,
 	linkPreviewImageThumbnailWidth: 192,
 	transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
 	generateHighQualityLinkPreview: false,
+	enableAutoSessionRecreation: true,
+	enableRecentMessageCache: true,
 	options: {},
 	appStateMacVerification: {
 		patch: false,
@@ -77,7 +88,8 @@ export const MEDIA_PATH_MAP: { [T in MediaType]?: string } = {
 	'thumbnail-link': '/mms/image',
 	'product-catalog-image': '/product/image',
 	'md-app-state': '',
-	'md-msg-hist': '/mms/md-app-state'
+	'md-msg-hist': '/mms/md-app-state',
+	'biz-cover-photo': '/pps/biz-cover-photo'
 }
 
 export const MEDIA_HKDF_KEY_MAPPING = {
@@ -98,14 +110,20 @@ export const MEDIA_HKDF_KEY_MAPPING = {
 	'md-app-state': 'App State',
 	'product-catalog-image': '',
 	'payment-bg-image': 'Payment Background',
-	ptv: 'Video'
+	ptv: 'Video',
+	'biz-cover-photo': 'Image'
 }
+
+export type MediaType = keyof typeof MEDIA_HKDF_KEY_MAPPING
 
 export const MEDIA_KEYS = Object.keys(MEDIA_PATH_MAP) as MediaType[]
 
 export const MIN_PREKEY_COUNT = 5
 
-export const INITIAL_PREKEY_COUNT = 30
+export const INITIAL_PREKEY_COUNT = 812
+
+export const UPLOAD_TIMEOUT = 30000 // 30 seconds
+export const MIN_UPLOAD_INTERVAL = 5000 // 5 seconds minimum between uploads
 
 export const DEFAULT_CACHE_TTLS = {
 	SIGNAL_STORE: 5 * 60, // 5 minutes
