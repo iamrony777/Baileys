@@ -13,6 +13,7 @@ import type {
 	ConnectionState,
 	Contact,
 	GroupMetadata,
+	GroupParticipant,
 	PresenceData,
 	WAMessage,
 	WAMessageCursor,
@@ -173,7 +174,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 							)
 						) {
 							update.$set.messages.$filter.cond.$not.$or.push({
-								$eq: ['$$this.message.key.id', m.message?.key.id as string]
+								$eq: ['$$this.message.key.id', m.message?.key?.id as string]
 							})
 						}
 					}
@@ -567,24 +568,25 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 				switch (action) {
 					case 'add':
 						metadata.participants.push(
-							...participants.map(id => ({
-								id,
+							...participants.map(p => ({
+								...p,
+								id: p.id,
 								isAdmin: false,
 								isSuperAdmin: false
-							}))
+							})) as GroupParticipant[]
 						)
 						break
 					case 'demote':
 					case 'promote':
 						for (const participant of metadata.participants) {
-							if (participants.includes(participant.id)) {
+							if (participants.some(p => p.id === participant.id)) {
 								participant.isAdmin = action === 'promote'
 							}
 						}
 
 						break
 					case 'remove':
-						metadata.participants = metadata.participants.filter(p => !participants.includes(p.id))
+						metadata.participants = metadata.participants.filter(p => !participants.some(p2 => p2.id === p.id))
 						break
 				}
 			}
@@ -638,7 +640,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		for (const jid in json.messages) {
 			const list = assertMessageList(jid)
 			for (const msg of json.messages[jid] || []) {
-				list.upsert(proto.WebMessageInfo.fromObject(msg), 'append')
+				list.upsert(proto.WebMessageInfo.fromObject(msg) as unknown as WAMessage, 'append')
 			}
 		}
 	}
@@ -736,17 +738,17 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 
 			const chat = await chats.findOne({ id: jid }, { projection: { _id: 0 } })
 			for (const m of chat?.messages ?? []) {
-				if (m?.message?.key.id === id) {
+				if (m?.message?.key?.id === id) {
 					return m.message
 				}
 			}
 		},
 		mostRecentMessage: async (jid: string) => {
-			const message: WAMessage | undefined =
+			const message: WAMessage | proto.IWebMessageInfo | undefined =
 				messages[jid]?.array.slice(-1)[0] ||
-				(await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0]?.message ||
+				(await chats.findOne({ id: jid }, { projection: { _id: 0 } }))?.messages?.slice(-1)[0]?.message as WAMessage | proto.IWebMessageInfo | undefined ||
 				undefined
-			return message
+			return message as WAMessage | undefined
 		},
 		fetchImageUrl: async (jid: string, sock: WASocket | undefined) => {
 			const contact = await contacts.findOne({ id: jid }, { projection: { _id: 0 } })

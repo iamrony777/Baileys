@@ -12,6 +12,7 @@ import type {
 	ConnectionState,
 	Contact,
 	GroupMetadata,
+	GroupParticipant,
 	PresenceData,
 	WAMessage,
 	WAMessageCursor,
@@ -116,7 +117,7 @@ export default ({
 	const logger =
 		_logger || DEFAULT_CONNECTION_CONFIG.logger.child({ stream: 'redis:store' })
 
-	const chats = new KeyedDB(chatKey, (c) => c.id) as KeyedDB<Chat, string>
+	const chats = new KeyedDB(chatKey, (c) => c.id!) as KeyedDB<Chat, string>
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } =
 		{}
 	const contacts: { [_: string]: Contact } = {}
@@ -352,17 +353,18 @@ export default ({
 				switch (action) {
 				case 'add':
 					metadata.participants.push(
-						...participants.map((id) => ({
-							id,
+						...participants.map((p) => ({
+							...p,
+							id: p.id,
 							isAdmin: false,
 							isSuperAdmin: false,
-						}))
+						})) as GroupParticipant[]
 					)
 					break
 				case 'demote':
 				case 'promote':
 					for(const participant of metadata.participants) {
-						if(participants.includes(participant.id)) {
+						if(participants.some(p => p.id === participant.id)) {
 							participant.isAdmin = action === 'promote'
 						}
 					}
@@ -370,7 +372,7 @@ export default ({
 					break
 				case 'remove':
 					metadata.participants = metadata.participants.filter(
-						(p) => !participants.includes(p.id)
+						(p) => !participants.some(p2 => p2.id === p.id)
 					)
 					break
 				}
@@ -420,7 +422,7 @@ export default ({
 		for(const jid in json.messages) {
 			const list = assertMessageList(jid)
 			for(const msg of json.messages[jid] || []) {
-				list.upsert(proto.WebMessageInfo.fromObject(msg), 'append')
+				list.upsert(proto.WebMessageInfo.fromObject(msg) as unknown as WAMessage, 'append')
 			}
 		}
 	}
@@ -485,7 +487,7 @@ export default ({
 		 * @returns Label IDs
 		 **/
 		getChatLabels: (chatId: string) => {
-			return labelAssociations.filter((la) => la.chatId === chatId).all()
+			return labelAssociations.filter(la => la.chatId === chatId).all()
 		},
 		getContactInfo: async(chatId: string) => {
 			const contacts = await redis.hGet(`contacts:${suffix}`, chatId)
@@ -507,8 +509,8 @@ export default ({
 		},
 		loadMessage: async(jid: string, id: string) => messages[jid]?.get(id),
 		mostRecentMessage: async(jid: string) => {
-			const message: WAMessage | undefined = messages[jid]?.array.slice(-1)[0]
-			return message
+			const message: WAMessage | proto.IWebMessageInfo | undefined = messages[jid]?.array.slice(-1)[0]
+			return message as WAMessage | undefined
 		},
 		fetchImageUrl: async(jid: string, sock: WASocket | undefined) => {
 			const contact = contacts[jid]
@@ -566,7 +568,7 @@ export default ({
 					for(const chat of data.array as unknown as Chat[]) {
 						await redis.hSet(
 							suffixKey,
-							chat.id,
+							chat.id!,
 							JSON.stringify(chat, BufferJSON.replacer)
 						)
 					}
