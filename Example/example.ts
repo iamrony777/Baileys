@@ -21,6 +21,7 @@ import makeWASocket, {
 	type WAMessageKey,
 	isJidNewsletter,
 	CacheStore,
+	 
 } from "../src";
 import { makeLibSignalRepository } from "../src/Signal/libsignal";
 import MAIN_LOGGER from "../src/Utils/logger";

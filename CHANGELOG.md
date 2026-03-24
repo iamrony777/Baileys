@@ -1,4 +1,4 @@
-# [7.0.0-rc.9-1.0](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.0) (2026-01-04)
+# [7.0.0-rc.9-1.1](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.1) (2026-01-04)
 
 
 ### Bug Fixes
