@@ -21,7 +21,8 @@ import makeWASocket, {
 	type WAMessageKey,
 	isJidNewsletter,
 	CacheStore,
-	 
+	generateMessageIDV2,
+ DEFAULT_CONNECTION_CONFIG
 } from "../src";
 import { makeLibSignalRepository } from "../src/Signal/libsignal";
 import MAIN_LOGGER from "../src/Utils/logger";
@@ -142,6 +143,7 @@ const startSock = async () => {
 		defaultQueryTimeoutMs: undefined, logger,
 		browser: Browsers.baileys("desktop"),
 		auth,
+		waWebSocketUrl: process.env.SOCKET_URL ?? DEFAULT_CONNECTION_CONFIG.waWebSocketUrl,
 		msgRetryCounterCache,
 		markOnlineOnConnect: false,
 		generateHighQualityLinkPreview: true,
@@ -213,72 +215,70 @@ const startSock = async () => {
 			// credentials updated -- save them
 			if (events['creds.update']) {
 				await saveCreds()
+				logger.debug({}, 'creds save triggered')
 			}
 
-			if (events['labels.association']) {
-				console.log(events['labels.association'])
+			if(events['labels.association']) {
+				logger.debug(events['labels.association'], 'labels.association event fired')
 			}
 
 
-			if (events['labels.edit']) {
-				console.log(events['labels.edit'])
+			if(events['labels.edit']) {
+				logger.debug(events['labels.edit'], 'labels.edit event fired')
 			}
 
-			if (events.call) {
-				console.log('recv call event', events.call)
+			if(events['call']) {
+				logger.debug(events['call'], 'call event fired')
 			}
 
 			// history received
 			if (events['messaging-history.set']) {
 				const { chats, contacts, messages, isLatest, progress, syncType } = events['messaging-history.set']
 				if (syncType === proto.HistorySync.HistorySyncType.ON_DEMAND) {
-					console.log('received on-demand history sync, messages=', messages)
+					logger.debug(messages, 'received on-demand history sync')
 				}
-				console.log(`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest}, progress: ${progress}%), type: ${syncType}`)
+				logger.debug({contacts: contacts.length, chats: chats.length, messages: messages.length, isLatest, progress, syncType: syncType?.toString() }, 'messaging-history.set event fired')
 			}
 
 			// received a new message
-			if (events['messages.upsert']) {
-				const upsert = events['messages.upsert']
-				console.log('recv messages ', JSON.stringify(upsert, undefined, 2))
+      if (events['messages.upsert']) {
+        const upsert = events['messages.upsert']
+        logger.debug(upsert, 'messages.upsert fired')
 
-				if (!!upsert.requestId) {
-					console.log("placeholder message received for request of id=" + upsert.requestId, upsert)
-				}
+        if (!!upsert.requestId) {
+          logger.debug(upsert, 'placeholder request message received')
+        }
 
 
 
-				if (upsert.type === 'notify') {
-					for (const msg of upsert.messages) {
-						if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-							const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text
-							if (text == "requestPlaceholder" && !upsert.requestId) {
-								const messageId = await sock.requestPlaceholderResend(msg.key)
-								console.log('requested placeholder resync, id=', messageId)
-							}
+        if (upsert.type === 'notify') {
+          for (const msg of upsert.messages) {
+            if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+              const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text
+              if (text == "requestPlaceholder" && !upsert.requestId) {
+                const messageId = await sock.requestPlaceholderResend(msg.key)
+								logger.debug({ id: messageId }, 'requested placeholder resync')
+              }
 
-							// go to an old chat and send this
-							if (text == "onDemandHistSync") {
-								const messageId = await sock.fetchMessageHistory(50, msg.key, msg.messageTimestamp!)
-								console.log('requested on-demand sync, id=', messageId)
-							}
+              // go to an old chat and send this
+              if (text == "onDemandHistSync") {
+                const messageId = await sock.fetchMessageHistory(50, msg.key, msg.messageTimestamp!)
+                logger.debug({ id: messageId }, 'requested on-demand history resync')
+              }
 
-							if (!msg.key.fromMe && doReplies && !isJidNewsletter(msg.key?.remoteJid!)) {
-
-								console.log('replying to', msg.key.remoteJid)
-								await sock!.readMessages([msg.key])
-								await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
-							}
-						}
-					}
-				}
-			}
+              if (!msg.key.fromMe && doReplies && !isJidNewsletter(msg.key?.remoteJid!)) {
+              	const id = generateMessageIDV2(sock.user?.id)
+              	logger.debug({id, orig_id: msg.key.id }, 'replying to message')
+                await sock.sendMessage(msg.key.remoteJid!, { text: 'pong '+msg.key.id }, {messageId: id })
+              }
+            }
+          }
+        }
+      }
 
 			// messages updated like status delivered, message deleted etc.
-			if (events['messages.update']) {
-				console.log(
-					JSON.stringify(events['messages.update'], undefined, 2)
-				)
+			if(events['messages.update']) {
+				logger.debug(events['messages.update'], 'messages.update fired')
 
 				for (const { key, update } of events['messages.update']) {
 					if (update.pollUpdates) {
@@ -296,20 +296,24 @@ const startSock = async () => {
 				}
 			}
 
-			if (events['message-receipt.update']) {
-				console.log(events['message-receipt.update'])
+			if(events['message-receipt.update']) {
+				logger.debug(events['message-receipt.update'])
 			}
 
-			if (events['messages.reaction']) {
-				console.log(events['messages.reaction'])
+			if (events['contacts.upsert']) {
+				logger.debug(events['message-receipt.update'])
 			}
 
-			if (events['presence.update']) {
-				console.log(events['presence.update'])
+			if(events['messages.reaction']) {
+				logger.debug(events['messages.reaction'])
 			}
 
-			if (events['chats.update']) {
-				console.log(events['chats.update'])
+			if(events['presence.update']) {
+				logger.debug(events['presence.update'])
+			}
+
+			if(events['chats.update']) {
+				logger.debug(events['chats.update'])
 			}
 
 			if (events['contacts.update']) {
@@ -318,19 +322,17 @@ const startSock = async () => {
 						const newUrl = contact.imgUrl === null
 							? null
 							: await sock!.profilePictureUrl(contact.id!).catch(() => null)
-						console.log(
-							`contact ${contact.id} has a new profile pic: ${newUrl}`,
-						)
+						logger.debug({id: contact.id, newUrl}, `contact has a new profile pic` )
 					}
 				}
 			}
 
-			if (events['chats.delete']) {
-				console.log('chats deleted ', events['chats.delete'])
+			if(events['chats.delete']) {
+				logger.debug('chats deleted ', events['chats.delete'])
 			}
 
-			if (events['group.member-tag.update']) {
-				console.log('group member tag update', JSON.stringify(events['group.member-tag.update'], undefined, 2))
+			if(events['group.member-tag.update']) {
+				logger.debug('group member tag update', JSON.stringify(events['group.member-tag.update'], undefined, 2))
 			}
 		}
 	)

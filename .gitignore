@@ -25,4 +25,5 @@ package-lock.json
 # Sentry Config File
 .sentryclirc
 *lock*
+wa-logs*
 coverage
