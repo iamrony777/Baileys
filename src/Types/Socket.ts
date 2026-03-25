@@ -107,6 +107,13 @@ export type SocketConfig = {
 	enableRecentMessageCache: boolean
 
 	/**
+	 * Enable interactive messages (buttons, lists, templates, carousel).
+	 * When true, injects biz/bot binary nodes required by WhatsApp.
+	 * @default true
+	 */
+	enableInteractiveMessages: boolean
+
+	/**
 	 * Returns if a jid should be ignored,
 	 * no event for that jid will be triggered.
 	 * Messages from that jid will also not be decrypted

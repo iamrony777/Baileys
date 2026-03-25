@@ -77,6 +77,8 @@ export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	generateHighQualityLinkPreview: false,
 	enableAutoSessionRecreation: true,
 	enableRecentMessageCache: true,
+	// Enable interactive messages (buttons, lists, templates, carousel)
+	enableInteractiveMessages: true,
 	options: {},
 	appStateMacVerification: {
 		patch: false,

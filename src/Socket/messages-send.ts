@@ -1,8 +1,13 @@
 import NodeCache from '@cacheable/node-cache'
 import { Boom } from '@hapi/boom'
+import { randomBytes } from 'crypto'
 import { proto } from '../../WAProto/index.js'
 import { DEFAULT_CACHE_TTLS, WA_DEFAULT_EPHEMERAL } from '../Defaults'
 import type {
+	AlbumMediaItem,
+	AlbumMediaResult,
+	AlbumMessageOptions,
+	AlbumSendResult,
 	AnyMessageContent,
 	MediaConnInfo,
 	MessageReceiptType,
@@ -26,6 +31,7 @@ import {
 	generateParticipantHashV2,
 	generateWAMessage,
 	getStatusCodeForMediaRetry,
+	hasNonNullishProperty,
 	getUrlFromDirectPath,
 	getWAUploadToServer,
 	MessageRetryManager,
@@ -45,6 +51,7 @@ import {
 	getBinaryNodeChildren,
 	isHostedLidUser,
 	isHostedPnUser,
+	isJidBot,
 	isJidGroup,
 	isLidUser,
 	isPnUser,
@@ -66,6 +73,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		patchMessageBeforeSending,
 		cachedGroupMetadata,
 		enableRecentMessageCache,
+		enableInteractiveMessages,
 		maxMsgRetryCount
 	} = config
 	const sock = makeNewsletterSocket(config)
@@ -600,6 +608,130 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return { nodes, shouldIncludeDeviceIdentity }
 	}
 
+	// ========== Interactive message detection helpers ==========
+
+	const getButtonType = (message: proto.IMessage): string | undefined => {
+		if (message.buttonsMessage) {
+			return 'buttons'
+		} else if (message.templateMessage) {
+			return 'template'
+		} else if (message.listMessage) {
+			return 'list'
+		} else if (message.buttonsResponseMessage) {
+			return 'buttons_response'
+		} else if (message.listResponseMessage) {
+			return 'list_response'
+		} else if (message.templateButtonReplyMessage) {
+			return 'template_reply'
+		} else if (message.interactiveMessage) {
+			if (message.interactiveMessage.nativeFlowMessage) {
+				return 'native_flow'
+			}
+
+			if (message.interactiveMessage.carouselMessage?.cards?.length) {
+				const hasNativeFlowButtons = message.interactiveMessage.carouselMessage.cards.some(
+					(card: proto.Message.IInteractiveMessage) => card?.nativeFlowMessage?.buttons?.length
+				)
+				if (hasNativeFlowButtons) {
+					return 'native_flow'
+				}
+
+				const hasCollectionCards = message.interactiveMessage.carouselMessage.cards.some(
+					(card: any) => card?.collectionMessage
+				)
+				if (hasCollectionCards) {
+					return 'native_flow'
+				}
+			}
+
+			return 'interactive'
+		}
+
+		const innerMessage = message.viewOnceMessage?.message || message.viewOnceMessageV2?.message
+		if (innerMessage) {
+			if (innerMessage.buttonsMessage) {
+				return 'buttons'
+			} else if (innerMessage.templateMessage) {
+				return 'template'
+			} else if (innerMessage.listMessage) {
+				return 'list'
+			} else if (innerMessage.buttonsResponseMessage) {
+				return 'buttons_response'
+			} else if (innerMessage.listResponseMessage) {
+				return 'list_response'
+			} else if (innerMessage.templateButtonReplyMessage) {
+				return 'template_reply'
+			} else if (innerMessage.interactiveMessage) {
+				if (innerMessage.interactiveMessage.nativeFlowMessage) {
+					return 'native_flow'
+				}
+
+				if (innerMessage.interactiveMessage.carouselMessage?.cards?.length) {
+					const hasNativeFlowButtons = innerMessage.interactiveMessage.carouselMessage.cards.some(
+						(card: any) => card?.nativeFlowMessage?.buttons?.length
+					)
+					if (hasNativeFlowButtons) {
+						return 'native_flow'
+					}
+
+					const hasCollectionCards = innerMessage.interactiveMessage.carouselMessage.cards.some(
+						(card: any) => card?.collectionMessage
+					)
+					if (hasCollectionCards) {
+						return 'native_flow'
+					}
+				}
+
+				return 'interactive'
+			}
+		}
+
+		return undefined
+	}
+
+	const isCarouselMessage = (message: proto.IMessage): boolean => {
+		const interactiveMsg =
+			message.interactiveMessage ||
+			message.viewOnceMessage?.message?.interactiveMessage ||
+			message.viewOnceMessageV2?.message?.interactiveMessage
+
+		if (interactiveMsg?.carouselMessage?.cards?.length) {
+			return true
+		}
+
+		return false
+	}
+
+	const isCatalogMessage = (message: proto.IMessage): boolean => {
+		const interactiveMsg =
+			message.interactiveMessage ||
+			message.viewOnceMessage?.message?.interactiveMessage ||
+			message.viewOnceMessageV2?.message?.interactiveMessage
+
+		const nativeFlow = interactiveMsg?.nativeFlowMessage
+		if (nativeFlow?.buttons?.length) {
+			return nativeFlow.buttons.some(
+				(btn: any) => btn?.name === 'catalog_message' || btn?.name === 'single_product' || btn?.name === 'product_list'
+			)
+		}
+
+		return false
+	}
+
+	const isListNativeFlow = (message: proto.IMessage): boolean => {
+		const interactiveMsg =
+			message.interactiveMessage ||
+			message.viewOnceMessage?.message?.interactiveMessage ||
+			message.viewOnceMessageV2?.message?.interactiveMessage
+
+		const nativeFlow = interactiveMsg?.nativeFlowMessage
+		if (nativeFlow?.buttons?.length) {
+			return nativeFlow.buttons.some((btn: any) => btn?.name === 'single_select' || btn?.name === 'multi_select')
+		}
+
+		return false
+	}
+
 	const relayMessage = async (
 		jid: string,
 		message: proto.IMessage,
@@ -630,6 +762,54 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		msgId = msgId || generateMessageIDV2(meId)
 		useUserDevicesCache = useUserDevicesCache !== false
 		useCachedGroupMetadata = useCachedGroupMetadata !== false && !isStatus
+
+		// Convert nativeFlowMessage with single_select to direct listMessage (legacy format)
+		// viewOnceMessage > interactiveMessage > nativeFlowMessage wrapper causes error 479
+		const innerMsg = message.viewOnceMessage?.message
+		const nativeFlow = innerMsg?.interactiveMessage?.nativeFlowMessage
+		if (nativeFlow?.buttons?.length) {
+			const singleSelectBtn = nativeFlow.buttons.find((btn: any) => btn?.name === 'single_select')
+			if (singleSelectBtn?.buttonParamsJson) {
+				try {
+					const params = JSON.parse(singleSelectBtn.buttonParamsJson)
+					const sections = params.sections?.map((section: any) => ({
+						title: section.title,
+						rows: section.rows?.map((row: any) => ({
+							rowId: row.id || row.rowId,
+							title: row.title,
+							description: row.description || ''
+						}))
+					}))
+
+					if (sections?.length) {
+						const listMessage = proto.Message.ListMessage.fromObject({
+							title: innerMsg?.interactiveMessage?.header?.title || '',
+							description: innerMsg?.interactiveMessage?.body?.text || '',
+							buttonText: params.title || 'Menu',
+							footerText: innerMsg?.interactiveMessage?.footer?.text || '',
+							listType: proto.Message.ListMessage.ListType.SINGLE_SELECT,
+							sections
+						})
+
+						delete message.viewOnceMessage
+						message.listMessage = listMessage
+						if (!message.messageContextInfo && innerMsg?.messageContextInfo) {
+							message.messageContextInfo = innerMsg.messageContextInfo
+						}
+
+						logger.info(
+							{ msgId, sectionsCount: sections.length, buttonText: params.title },
+							'[LIST CONVERT] Converted nativeFlowMessage(single_select) to direct listMessage format'
+						)
+					}
+				} catch (err) {
+					logger.warn(
+						{ msgId, error: (err as Error).message },
+						'[LIST CONVERT] Failed to convert nativeFlowMessage to listMessage, sending as-is'
+					)
+				}
+			}
+		}
 
 		const participants: BinaryNode[] = []
 		const destinationJid = !isStatus ? finalJid : statusJid
@@ -962,6 +1142,123 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				content: binaryNodeContent
 			}
 
+			// Inject 'biz' node for interactive messages
+			const buttonType = getButtonType(message)
+			const isCatalog = isCatalogMessage(message)
+			const isCarousel = isCarouselMessage(message)
+
+			const deferredNodes: BinaryNode[] = []
+
+			if ((buttonType || isCarousel) && enableInteractiveMessages) {
+				const effectiveButtonType = buttonType || 'native_flow'
+
+				const interactiveMsg =
+					message.interactiveMessage ||
+					message.viewOnceMessage?.message?.interactiveMessage ||
+					message.viewOnceMessageV2?.message?.interactiveMessage
+
+				let nativeFlowButtons = interactiveMsg?.nativeFlowMessage?.buttons || []
+				if (nativeFlowButtons.length === 0 && interactiveMsg?.carouselMessage?.cards?.length) {
+					nativeFlowButtons = interactiveMsg.carouselMessage.cards.flatMap(
+						(card: proto.Message.IInteractiveMessage) => card?.nativeFlowMessage?.buttons || []
+					)
+				}
+
+				try {
+					const allButtonNames = nativeFlowButtons.map((b: any) => b?.name).filter(Boolean)
+
+					if (effectiveButtonType === 'list') {
+						deferredNodes.push({
+							tag: 'biz',
+							attrs: {},
+							content: [
+								{
+									tag: 'list',
+									attrs: {
+										type: 'product_list',
+										v: '2'
+									}
+								}
+							]
+						})
+					} else {
+						const SPECIAL_FLOW_NAMES: Record<string, string> = {
+							review_and_pay: 'payment_info',
+							payment_info: 'payment_info',
+							mpm: 'mpm',
+							review_order: 'order_details'
+						}
+						const firstButtonName = allButtonNames[0] || ''
+						const nativeFlowName = SPECIAL_FLOW_NAMES[firstButtonName] || 'mixed'
+
+						const interactiveType = 'native_flow'
+						const bizContent: BinaryNode[] = [
+							{
+								tag: 'interactive',
+								attrs: {
+									type: interactiveType,
+									v: '1'
+								},
+								content: [
+									{
+										tag: interactiveType,
+										attrs: {
+											v: '9',
+											name: nativeFlowName
+										}
+									}
+								]
+							}
+						]
+
+						if (isCarousel) {
+							const decisionId = randomBytes(20).toString('hex')
+							bizContent.push({
+								tag: 'quality_control',
+								attrs: {
+									decision_id: decisionId
+								},
+								content: [
+									{
+										tag: 'decision_source',
+										attrs: {
+											value: 'df'
+										}
+									}
+								]
+							})
+						}
+
+						deferredNodes.push({
+							tag: 'biz',
+							attrs: {},
+							content: bizContent
+						})
+					}
+
+					// Bot node — skip for native_flow buttons, carousels, catalogs
+					const isNativeFlowButtons = buttonType === 'native_flow'
+
+					const isPrivateUserChat =
+						(isPnUser(destinationJid) || isLidUser(destinationJid) || destinationJid?.endsWith('@c.us')) &&
+						!isJidBot(destinationJid)
+
+					if (isPrivateUserChat && !isCarousel && !isCatalog && buttonType !== 'list' && !isNativeFlowButtons) {
+						deferredNodes.push({
+							tag: 'bot',
+							attrs: { biz_bot: '1' }
+						})
+					}
+				} catch (error) {
+					logger.error({ error, msgId, buttonType: effectiveButtonType }, '[BIZ NODE] Failed to inject biz node')
+				}
+			} else if (buttonType && !enableInteractiveMessages) {
+				logger.warn(
+					{ msgId, buttonType },
+					'[Interactive] Message detected but feature disabled (enableInteractiveMessages=false)'
+				)
+			}
+
 			// if the participant to send to is explicitly specified (generally retry recp)
 			// ensure the message is only sent to that person
 			// if a retry receipt is sent to everyone -- it'll fail decryption for everyone else who received the msg
@@ -979,7 +1276,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				stanza.attrs.to = destinationJid
 			}
 
-			if (shouldIncludeDeviceIdentity) {
+			// Always include device-identity for carousel
+			if (shouldIncludeDeviceIdentity || isCarousel) {
 				;(stanza.content as BinaryNode[]).push({
 					tag: 'device-identity',
 					attrs: {},
@@ -1024,6 +1322,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					attrs: {},
 					content: tcTokenBuffer
 				})
+			}
+
+			// Push deferred biz/bot nodes after device-identity and tctoken
+			if (deferredNodes.length > 0) {
+				;(stanza.content as BinaryNode[]).push(...deferredNodes)
 			}
 
 			if (additionalNodes && additionalNodes.length > 0) {
@@ -1071,7 +1374,13 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return 'text'
 	}
 
-	const getMediaType = (message: proto.IMessage) => {
+	const getMediaType = (message: proto.IMessage): string => {
+		// Unwrap viewOnceMessage to detect media inside
+		const inner = message.viewOnceMessage?.message || message.viewOnceMessageV2?.message
+		if (inner) {
+			return getMediaType(inner)
+		}
+
 		if (message.imageMessage) {
 			return 'image'
 		} else if (message.videoMessage) {
@@ -1202,7 +1511,232 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 			return message
 		},
+		sendAlbumMessage: async (
+			jid: string,
+			album: AlbumMessageOptions,
+			options: MiscMessageGenerationOptions = {}
+		): Promise<AlbumSendResult> => {
+			const startTime = Date.now()
+			const userJid = authState.creds.me!.id
+
+			const { medias, delay: delayConfig = 'adaptive', retryCount = 3, continueOnFailure = true } = album
+
+			if (!medias || medias.length < 2) {
+				throw new Boom('Album must have at least 2 media items', { statusCode: 400 })
+			}
+
+			if (medias.length > 10) {
+				throw new Boom('Album cannot have more than 10 media items (WhatsApp limit)', { statusCode: 400 })
+			}
+
+			const imageCount = medias.filter(m => hasNonNullishProperty(m as AnyMessageContent, 'image')).length
+			const videoCount = medias.filter(m => hasNonNullishProperty(m as AnyMessageContent, 'video')).length
+
+			logger.info(
+				{ jid, totalItems: medias.length, imageCount, videoCount, delayConfig, retryCount },
+				'Starting album message send'
+			)
+
+			const albumRootMsg = await generateWAMessage(
+				jid,
+				{ album: { medias, delay: delayConfig, retryCount, continueOnFailure } },
+				{
+					logger,
+					userJid,
+					getUrlInfo: text =>
+						getUrlInfo(text, {
+							thumbnailWidth: linkPreviewImageThumbnailWidth,
+							fetchOpts: { timeout: 3_000, ...(httpRequestOptions || {}) },
+							logger,
+							uploadImage: generateHighQualityLinkPreview ? waUploadToServer : undefined
+						}),
+					upload: waUploadToServer,
+					mediaCache: config.mediaCache,
+					timestamp: options.timestamp,
+					quoted: options.quoted,
+					ephemeralExpiration: options.ephemeralExpiration,
+					mediaUploadTimeoutMs: options.mediaUploadTimeoutMs
+				}
+			)
+
+			const albumKey = albumRootMsg.key
+
+			await relayMessage(jid, albumRootMsg.message!, {
+				messageId: albumRootMsg.key.id!,
+				useCachedGroupMetadata: options.useCachedGroupMetadata
+			})
+
+			if (config.emitOwnEvents) {
+				process.nextTick(async () => {
+					await messageMutex.mutex(() => upsertMessage(albumRootMsg, 'append'))
+				})
+			}
+
+			logger.debug({ albumKeyId: albumKey.id }, 'Album root message relayed')
+
+			const results: AlbumMediaResult[] = []
+
+			const calculateAdaptiveDelay = (media: AlbumMediaItem, index: number): number => {
+				const baseDelay = 500
+				const isVideo = 'video' in media
+				const mediaTypeMultiplier = isVideo ? 2.0 : 1.0
+				const positionMultiplier = 1 + index * 0.1
+				const jitter = Math.random() * 200
+				return Math.round(baseDelay * mediaTypeMultiplier * positionMultiplier + jitter)
+			}
+
+			const getDelay = (media: AlbumMediaItem, index: number): number => {
+				if (delayConfig === 'adaptive') {
+					return calculateAdaptiveDelay(media, index)
+				}
+
+				return delayConfig
+			}
+
+			const sendMediaWithRetry = async (
+				media: AlbumMediaItem,
+				index: number
+			): Promise<AlbumMediaResult> => {
+				const itemStartTime = Date.now()
+				let lastError: Error | undefined
+				let attempts = 0
+
+				for (let attempt = 0; attempt <= retryCount; attempt++) {
+					attempts = attempt + 1
+					try {
+						const mediaMsg = await generateWAMessage(jid, media as AnyMessageContent, {
+							logger,
+							userJid,
+							getUrlInfo: text =>
+								getUrlInfo(text, {
+									thumbnailWidth: linkPreviewImageThumbnailWidth,
+									fetchOpts: { timeout: 3_000, ...(httpRequestOptions || {}) },
+									logger,
+									uploadImage: generateHighQualityLinkPreview ? waUploadToServer : undefined
+								}),
+							upload: waUploadToServer,
+							mediaCache: config.mediaCache,
+							timestamp: options.timestamp,
+							quoted: options.quoted,
+							ephemeralExpiration: options.ephemeralExpiration,
+							mediaUploadTimeoutMs: options.mediaUploadTimeoutMs
+						})
+
+						if (!mediaMsg.message) {
+							throw new Boom('Missing message content for album media item')
+						}
+
+						if (!mediaMsg.message.messageContextInfo) {
+							mediaMsg.message.messageContextInfo = {}
+						}
+
+						mediaMsg.message.messageContextInfo.messageAssociation = {
+							associationType: proto.MessageAssociation.AssociationType.MEDIA_ALBUM,
+							parentMessageKey: albumKey
+						}
+
+						await relayMessage(jid, mediaMsg.message, {
+							messageId: mediaMsg.key.id!,
+							useCachedGroupMetadata: options.useCachedGroupMetadata
+						})
+
+						if (config.emitOwnEvents) {
+							process.nextTick(async () => {
+								await messageMutex.mutex(() => upsertMessage(mediaMsg, 'append'))
+							})
+						}
+
+						logger.debug({ index, msgId: mediaMsg.key.id, attempts }, 'Album media item sent successfully')
+
+						return {
+							index,
+							success: true,
+							message: mediaMsg,
+							retryAttempts: attempts,
+							latencyMs: Date.now() - itemStartTime
+						}
+					} catch (error) {
+						lastError = error as Error
+						logger.warn(
+							{ index, attempt: attempts, error: lastError.message },
+							'Album media item send failed, will retry'
+						)
+
+						if (attempt < retryCount) {
+							const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 10000)
+							await new Promise(resolve => setTimeout(resolve, backoffDelay))
+						}
+					}
+				}
+
+				logger.error({ index, attempts, error: lastError?.message }, 'Album media item failed after all retries')
+
+				return {
+					index,
+					success: false,
+					error: lastError,
+					retryAttempts: attempts,
+					latencyMs: Date.now() - itemStartTime
+				}
+			}
+
+			for (let i = 0; i < medias.length; i++) {
+				const media = medias[i]!
+
+				const result = await sendMediaWithRetry(media, i)
+				results.push(result)
+
+				if (!result.success && !continueOnFailure) {
+					logger.warn(
+						{ index: i, totalItems: medias.length },
+						'Album send stopped due to failure (continueOnFailure=false)'
+					)
+					break
+				}
+
+				if (i < medias.length - 1) {
+					const delay = getDelay(media, i)
+					await new Promise(resolve => setTimeout(resolve, delay))
+				}
+			}
+
+			const attemptedItems = results.length
+			const stoppedEarly = attemptedItems < medias.length
+			const successCount = results.filter(r => r.success).length
+			const failedCount = results.filter(r => !r.success).length
+			const failedIndices = results.filter(r => !r.success).map(r => r.index)
+			const totalLatencyMs = Date.now() - startTime
+
+			const finalResult: AlbumSendResult = {
+				albumKey,
+				results,
+				totalItems: medias.length,
+				attemptedItems,
+				successCount,
+				failedCount,
+				failedIndices,
+				success: failedCount === 0 && !stoppedEarly,
+				stoppedEarly,
+				totalLatencyMs
+			}
+
+			logger.info(
+				{ albumKeyId: albumKey.id, totalItems: medias.length, successCount, failedCount, totalLatencyMs },
+				'Album message send completed'
+			)
+
+			return finalResult
+		},
+
 		sendMessage: async (jid: string, content: AnyMessageContent, options: MiscMessageGenerationOptions = {}) => {
+			// Album messages must use sendAlbumMessage instead
+			if (typeof content === 'object' && 'album' in content) {
+				throw new Boom(
+					'Cannot send album messages with sendMessage(). Use sendAlbumMessage() instead.',
+					{ statusCode: 400 }
+				)
+			}
+
 			const userJid = authState.creds.me!.id
 			if (
 				typeof content === 'object' &&

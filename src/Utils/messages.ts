@@ -14,12 +14,20 @@ import {
 import type {
 	AnyMediaMessageContent,
 	AnyMessageContent,
+	ButtonMessageOptions,
+	CarouselCardInput,
+	CarouselMessageOptions,
 	DownloadableMessage,
+	ListMessageOptions,
 	MessageContentGenerationOptions,
 	MessageGenerationOptions,
 	MessageGenerationOptionsFromContent,
 	MessageUserReceipt,
 	MessageWithContextInfo,
+	NativeButton,
+	NativeFlowButton,
+	ProductCarouselMessageOptions,
+	ProductListMessageOptions,
 	WAMediaUpload,
 	WAMessage,
 	WAMessageContent,
@@ -34,10 +42,12 @@ import type { ILogger } from './logger'
 import {
 	downloadContentFromMessage,
 	encryptedStream,
+	extractImageThumb,
 	generateThumbnail,
 	getAudioDuration,
 	getAudioWaveform,
 	getRawMediaUploadData,
+	getStream,
 	type MediaDownloadOptions
 } from './messages-media'
 import { shouldIncludeReportingToken } from './reporting-utils'
@@ -391,12 +401,799 @@ function hasOptionalProperty<T, K extends PropertyKey>(obj: T, key: K): obj is W
 	return typeof obj === 'object' && obj !== null && key in obj && (obj as any)[key] !== null
 }
 
+const validateNonEmptyString = (value: string | undefined, fieldName: string): void => {
+	if (!value || value.trim().length === 0) {
+		throw new Boom(`${fieldName} is required and must be non-empty`, { statusCode: 400 })
+	}
+}
+
+// ========== Interactive Message Generation Functions ==========
+
+/**
+ * Converts a NativeButton to the WhatsApp Native Flow format
+ */
+export const formatNativeFlowButton = (button: NativeButton): NativeFlowButton => {
+	validateNonEmptyString(button.text, 'text')
+
+	switch (button.type) {
+		case 'url':
+			validateNonEmptyString(button.url, 'url')
+			return {
+				name: 'cta_url',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					url: button.url,
+					merchant_url: button.merchantUrl || button.url
+				})
+			}
+		case 'copy':
+			validateNonEmptyString(button.copyText, 'copyText')
+			return {
+				name: 'cta_copy',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					copy_code: button.copyText
+				})
+			}
+		case 'reply':
+			validateNonEmptyString(button.id, 'id')
+			return {
+				name: 'quick_reply',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					id: button.id
+				})
+			}
+		case 'call':
+			validateNonEmptyString(button.phoneNumber, 'phoneNumber')
+			return {
+				name: 'cta_call',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					phone_number: button.phoneNumber
+				})
+			}
+		default:
+			throw new Boom('Invalid button type', { statusCode: 400 })
+	}
+}
+
+/**
+ * Generates a button message using Native Flow format wrapped in viewOnceMessage
+ * This is the modern approach for button messages that works on iOS and Android
+ */
+export const generateButtonMessage = async (
+	options: ButtonMessageOptions,
+	mediaOptions?: MessageContentGenerationOptions
+): Promise<WAMessageContent> => {
+	const { buttons, text, footer, headerTitle, headerImage, headerVideo } = options
+
+	if (!buttons || buttons.length === 0) {
+		throw new Boom('At least one button is required', { statusCode: 400 })
+	}
+
+	if (buttons.length > 3) {
+		throw new Boom('Maximum 3 buttons allowed', { statusCode: 400 })
+	}
+
+	if (headerImage && headerVideo) {
+		throw new Boom('Cannot have both headerImage and headerVideo. Choose one.', { statusCode: 400 })
+	}
+
+	const formattedButtons = buttons.map(formatNativeFlowButton)
+
+	const hasMedia = !!(headerImage || headerVideo)
+	const header: proto.Message.InteractiveMessage.IHeader = {
+		title: hasMedia ? '' : headerTitle || '',
+		hasMediaAttachment: hasMedia
+	}
+
+	if (hasMedia && mediaOptions) {
+		if (headerImage) {
+			const { imageMessage } = await prepareWAMessageMedia({ image: headerImage }, mediaOptions)
+			header.imageMessage = imageMessage
+		} else if (headerVideo) {
+			const { videoMessage } = await prepareWAMessageMedia({ video: headerVideo }, mediaOptions)
+			header.videoMessage = videoMessage
+		}
+	} else if (hasMedia && !mediaOptions) {
+		throw new Boom('mediaOptions required for processing header media', { statusCode: 400 })
+	}
+
+	const interactiveMessage: proto.Message.IInteractiveMessage = {
+		body: { text: text || '' },
+		footer: footer ? { text: footer } : undefined,
+		header,
+		nativeFlowMessage: {
+			buttons: formattedButtons,
+			messageParamsJson: JSON.stringify({}),
+			messageVersion: 2
+		}
+	}
+
+	return {
+		viewOnceMessage: {
+			message: {
+				interactiveMessage
+			}
+		}
+	}
+}
+
+/**
+ * Generates a carousel message with multiple cards, each with their own buttons
+ * Returns direct interactiveMessage (no viewOnceMessage wrapper)
+ */
+export const generateCarouselMessage = async (
+	options: CarouselMessageOptions,
+	mediaOptions?: MessageContentGenerationOptions
+): Promise<WAMessageContent> => {
+	const { cards, title, text, footer } = options
+
+	if (!cards || cards.length < 2) {
+		throw new Boom('Carousel requires at least 2 cards', { statusCode: 400 })
+	}
+
+	if (cards.length > 10) {
+		throw new Boom('Maximum 10 cards allowed in carousel', { statusCode: 400 })
+	}
+
+	for (let i = 0; i < cards.length; i++) {
+		const card = cards[i]
+		if (!card) continue
+
+		if (card.image && card.video) {
+			throw new Boom(`Card ${i}: Cannot have both image and video. Choose one.`, { statusCode: 400 })
+		}
+
+		if (!card.buttons || card.buttons.length === 0) {
+			throw new Boom(`Card ${i}: At least one button is required per card`, { statusCode: 400 })
+		}
+	}
+
+	const hasAnyMedia = cards.some(card => card.image || card.video)
+	if (hasAnyMedia && !mediaOptions) {
+		throw new Boom('mediaOptions required for processing card media', { statusCode: 400 })
+	}
+
+	const cardsWithoutMedia = cards.filter(card => !card.image && !card.video)
+	if (cardsWithoutMedia.length > 0) {
+		mediaOptions?.logger?.warn(
+			{ cardsWithoutMedia: cardsWithoutMedia.length, totalCards: cards.length },
+			'[CAROUSEL] WARNING: Cards without media will NOT render on WhatsApp Web. Every card MUST have an image or video.'
+		)
+	}
+
+	const recoverCarouselImageMetadata = async (
+		imageMessage: proto.Message.IImageMessage | null | undefined,
+		cardImage: WAMediaUpload,
+		cardTitle: string | undefined,
+		uploadOptions: MessageContentGenerationOptions
+	) => {
+		if (!imageMessage) return
+
+		const missingThumbnail = !imageMessage.jpegThumbnail
+		const missingWidth = !imageMessage.width
+		const missingHeight = !imageMessage.height
+		if (!missingThumbnail && !missingWidth && !missingHeight) return
+
+		try {
+			const { stream } = await getStream(cardImage, uploadOptions.options)
+			const { buffer, original } = await extractImageThumb(stream)
+
+			if (missingThumbnail) {
+				imageMessage.jpegThumbnail = buffer.toString('base64')
+			}
+
+			if (missingWidth && original.width) {
+				imageMessage.width = original.width
+			}
+
+			if (missingHeight && original.height) {
+				imageMessage.height = original.height
+			}
+		} catch (error) {
+			uploadOptions.logger?.warn(
+				{ cardTitle, trace: error instanceof Error ? error.stack : String(error) },
+				'[CAROUSEL] Failed source-media thumbnail fallback'
+			)
+		}
+	}
+
+	const carouselCards = await Promise.all(
+		cards.map(async card => {
+			const hasMedia = !!(card.image || card.video)
+
+			const header: any = {
+				title: card.title || '',
+				subtitle: card.footer || '',
+				hasMediaAttachment: hasMedia
+			}
+
+			if (hasMedia && mediaOptions) {
+				if (card.image) {
+					const { imageMessage } = await prepareWAMessageMedia({ image: card.image }, mediaOptions)
+
+					await recoverCarouselImageMetadata(imageMessage, card.image, card.title, mediaOptions)
+
+					if (imageMessage && !imageMessage.jpegThumbnail) {
+						mediaOptions.logger?.warn(
+							{ cardTitle: card.title },
+							'[CAROUSEL] imageMessage missing jpegThumbnail - Web may not render'
+						)
+					}
+
+					if (imageMessage && (!imageMessage.height || !imageMessage.width)) {
+						mediaOptions.logger?.warn(
+							{ cardTitle: card.title, height: imageMessage.height, width: imageMessage.width },
+							'[CAROUSEL] imageMessage missing dimensions - setting defaults'
+						)
+						if (!imageMessage.height) imageMessage.height = 500
+						if (!imageMessage.width) imageMessage.width = 500
+					}
+
+					header.imageMessage = imageMessage
+				} else if (card.video) {
+					const { videoMessage } = await prepareWAMessageMedia({ video: card.video }, mediaOptions)
+					header.videoMessage = videoMessage
+				}
+			}
+
+			return {
+				header,
+				body: { text: card.body || '' },
+				footer: card.footer ? { text: card.footer } : undefined,
+				nativeFlowMessage: {
+					buttons: card.buttons.map(formatNativeFlowButton)
+				}
+			}
+		})
+	)
+
+	const interactiveMessage: proto.Message.IInteractiveMessage = {
+		carouselMessage: {
+			cards: carouselCards,
+			messageVersion: 1
+		},
+		header: { title: title || ' ', hasMediaAttachment: false },
+		body: { text: text || '' },
+		footer: footer ? { text: footer } : undefined
+	}
+
+	return {
+		interactiveMessage
+	}
+}
+
+// ========== List Message Limits (WhatsApp enforced) ==========
+
+const LIST_LIMITS = {
+	MAX_SECTIONS: 10,
+	MAX_ROWS_PER_SECTION: 10,
+	MAX_TOTAL_ROWS: 30,
+	MAX_SECTION_TITLE: 24,
+	MAX_ROW_TITLE: 24,
+	MAX_ROW_DESCRIPTION: 72,
+	MAX_ROW_ID: 200,
+	MAX_BUTTON_TEXT: 20
+} as const
+
+const validateListSections = (
+	sections: Array<{ title: string; rows: Array<{ id?: string; rowId?: string; title: string; description?: string }> }>,
+	buttonText?: string
+): void => {
+	if (!sections || sections.length === 0) {
+		throw new Boom('At least one section is required', { statusCode: 400 })
+	}
+
+	if (sections.length > LIST_LIMITS.MAX_SECTIONS) {
+		throw new Boom(`Maximum ${LIST_LIMITS.MAX_SECTIONS} sections allowed, got ${sections.length}`, { statusCode: 400 })
+	}
+
+	if (buttonText && buttonText.length > LIST_LIMITS.MAX_BUTTON_TEXT) {
+		throw new Boom(`buttonText max ${LIST_LIMITS.MAX_BUTTON_TEXT} characters, got ${buttonText.length}`, {
+			statusCode: 400
+		})
+	}
+
+	let totalRows = 0
+	for (const section of sections) {
+		if (section.title && section.title.length > LIST_LIMITS.MAX_SECTION_TITLE) {
+			throw new Boom(
+				`Section title max ${LIST_LIMITS.MAX_SECTION_TITLE} characters, got ${section.title.length}: "${section.title}"`,
+				{ statusCode: 400 }
+			)
+		}
+
+		if (!section.rows || section.rows.length === 0) {
+			throw new Boom('Each section must have at least one row', { statusCode: 400 })
+		}
+
+		if (section.rows.length > LIST_LIMITS.MAX_ROWS_PER_SECTION) {
+			throw new Boom(
+				`Maximum ${LIST_LIMITS.MAX_ROWS_PER_SECTION} rows per section, got ${section.rows.length} in "${section.title}"`,
+				{ statusCode: 400 }
+			)
+		}
+
+		for (const row of section.rows) {
+			const rowId = row.id || row.rowId || ''
+			if (rowId.length > LIST_LIMITS.MAX_ROW_ID) {
+				throw new Boom(`Row ID max ${LIST_LIMITS.MAX_ROW_ID} characters, got ${rowId.length}`, { statusCode: 400 })
+			}
+
+			if (row.title && row.title.length > LIST_LIMITS.MAX_ROW_TITLE) {
+				throw new Boom(
+					`Row title max ${LIST_LIMITS.MAX_ROW_TITLE} characters, got ${row.title.length}: "${row.title}"`,
+					{ statusCode: 400 }
+				)
+			}
+
+			if (row.description && row.description.length > LIST_LIMITS.MAX_ROW_DESCRIPTION) {
+				throw new Boom(
+					`Row description max ${LIST_LIMITS.MAX_ROW_DESCRIPTION} characters, got ${row.description.length}: "${row.description.substring(0, 30)}..."`,
+					{ statusCode: 400 }
+				)
+			}
+		}
+
+		totalRows += section.rows.length
+	}
+
+	if (totalRows > LIST_LIMITS.MAX_TOTAL_ROWS) {
+		throw new Boom(`Maximum ${LIST_LIMITS.MAX_TOTAL_ROWS} total rows allowed, got ${totalRows}`, { statusCode: 400 })
+	}
+}
+
+/**
+ * Generates a list message using Native Flow format (single_select)
+ * Uses viewOnceMessage wrapper for compatibility
+ */
+export const generateListMessage = (options: ListMessageOptions): WAMessageContent => {
+	const { buttonText, sections, text, title, footer } = options
+
+	validateListSections(sections, buttonText)
+
+	const formattedSections = sections.map(section => ({
+		title: section.title,
+		rows: section.rows.map(row => ({
+			id: row.id,
+			title: row.title,
+			description: row.description || ''
+		}))
+	}))
+
+	const nativeFlowMessage = {
+		buttons: [
+			{
+				name: 'single_select',
+				buttonParamsJson: JSON.stringify({
+					title: buttonText,
+					sections: formattedSections
+				})
+			}
+		],
+		messageParamsJson: JSON.stringify({}),
+		messageVersion: 2
+	}
+
+	const interactiveMessage: proto.Message.IInteractiveMessage = {
+		body: { text: text || '' },
+		footer: footer ? { text: footer } : undefined,
+		header: title
+			? {
+					title,
+					subtitle: '',
+					hasMediaAttachment: false
+				}
+			: undefined,
+		nativeFlowMessage
+	}
+
+	return {
+		viewOnceMessage: {
+			message: {
+				messageContextInfo: {
+					deviceListMetadata: {},
+					deviceListMetadataVersion: 2
+				},
+				interactiveMessage
+			}
+		}
+	}
+}
+
+/**
+ * Generates a product list message (multi-product) from the WhatsApp Business catalog
+ */
+export const generateProductListMessage = (options: ProductListMessageOptions): WAMessageContent => {
+	const { title: listTitle, description, buttonText, footerText, businessOwnerJid, productSections, headerImage } = options
+
+	validateNonEmptyString(listTitle, 'title')
+	validateNonEmptyString(description, 'description')
+	validateNonEmptyString(buttonText, 'buttonText')
+	validateNonEmptyString(businessOwnerJid, 'businessOwnerJid')
+
+	if (!productSections || productSections.length === 0) {
+		throw new Boom('At least one product section is required', { statusCode: 400 })
+	}
+
+	for (const section of productSections) {
+		if (!section.title || typeof section.title !== 'string' || section.title.trim().length === 0) {
+			throw new Boom('Each section must have a non-empty title', { statusCode: 400 })
+		}
+
+		if (!section.products || section.products.length === 0) {
+			throw new Boom(`Section "${section.title}" must have at least one product`, { statusCode: 400 })
+		}
+
+		for (const product of section.products) {
+			if (!product || typeof product.productId !== 'string' || product.productId.trim().length === 0) {
+				throw new Boom(`Each product in section "${section.title}" must have a non-empty productId`, {
+					statusCode: 400
+				})
+			}
+		}
+	}
+
+	const totalProducts = productSections.reduce((sum, section) => sum + section.products.length, 0)
+	if (totalProducts > 30) {
+		throw new Boom(`Maximum 30 products allowed, got ${totalProducts}`, { statusCode: 400 })
+	}
+
+	const formattedSections = productSections.map(section => ({
+		title: section.title,
+		products: section.products.map(product => ({
+			productId: product.productId
+		}))
+	}))
+
+	const productListInfo: proto.Message.ListMessage.IProductListInfo = {
+		productSections: formattedSections,
+		businessOwnerJid: jidNormalizedUser(businessOwnerJid)
+	}
+
+	if (headerImage) {
+		if (
+			!headerImage.productId ||
+			typeof headerImage.productId !== 'string' ||
+			headerImage.productId.trim().length === 0
+		) {
+			throw new Boom('headerImage.productId must be a non-empty string', { statusCode: 400 })
+		}
+
+		productListInfo.headerImage = {
+			productId: headerImage.productId,
+			jpegThumbnail: headerImage.jpegThumbnail
+		}
+	}
+
+	const listMessage: proto.Message.IListMessage = {
+		title: listTitle,
+		description,
+		buttonText,
+		listType: proto.Message.ListMessage.ListType.PRODUCT_LIST,
+		productListInfo,
+		footerText: footerText || undefined
+	}
+
+	return {
+		listMessage: WAProto.Message.ListMessage.fromObject(listMessage)
+	}
+}
+
+/**
+ * Generates a product carousel message using products from WhatsApp Business catalog
+ */
+export const generateProductCarouselMessage = (options: ProductCarouselMessageOptions): WAMessageContent => {
+	const { businessOwnerJid, products, body } = options
+
+	validateNonEmptyString(businessOwnerJid, 'businessOwnerJid')
+
+	if (!products || products.length < 2) {
+		throw new Boom('Product carousel requires at least 2 products', { statusCode: 400 })
+	}
+
+	if (products.length > 10) {
+		throw new Boom('Maximum 10 products allowed in carousel', { statusCode: 400 })
+	}
+
+	for (let i = 0; i < products.length; i++) {
+		const product = products[i]
+		if (!product) continue
+
+		if (!product.productId || typeof product.productId !== 'string' || product.productId.trim().length === 0) {
+			throw new Boom(`Product at index ${i} must have a non-empty productId`, { statusCode: 400 })
+		}
+	}
+
+	const normalizedBizJid = jidNormalizedUser(businessOwnerJid)
+
+	const productCards: proto.Message.IInteractiveMessage[] = products.map(product => ({
+		collectionMessage: {
+			bizJid: normalizedBizJid,
+			id: product.productId,
+			messageVersion: 1
+		}
+	}))
+
+	const interactiveMessage: proto.Message.IInteractiveMessage = {
+		body: { text: body || '' },
+		carouselMessage: {
+			cards: productCards,
+			messageVersion: 1
+		}
+	}
+
+	return {
+		viewOnceMessage: {
+			message: {
+				messageContextInfo: {
+					deviceListMetadata: {},
+					deviceListMetadataVersion: 2
+				},
+				interactiveMessage
+			}
+		}
+	}
+}
+
+/**
+ * Generates a button message using the legacy buttonsMessage format
+ * @deprecated Use generateButtonMessage instead for better compatibility
+ */
+export const generateButtonMessageLegacy = (
+	buttons: Array<{ id?: string; text: string }>,
+	text: string,
+	footer?: string
+): WAMessageContent => {
+	const formattedButtons = buttons.map((button, index) => ({
+		buttonId: button.id || `btn_${index}`,
+		buttonText: { displayText: button.text },
+		type: proto.Message.ButtonsMessage.Button.Type.RESPONSE
+	}))
+
+	return {
+		buttonsMessage: WAProto.Message.ButtonsMessage.fromObject({
+			contentText: text,
+			footerText: footer,
+			buttons: formattedButtons,
+			headerType: proto.Message.ButtonsMessage.HeaderType.EMPTY
+		})
+	}
+}
+
+/**
+ * Generates a list message using the legacy listMessage format
+ * @deprecated Use generateListMessage instead for better compatibility
+ */
+export const generateListMessageLegacy = (
+	listInfo: {
+		sections: Array<{
+			title: string
+			rows: Array<{ id?: string; rowId?: string; title: string; description?: string }>
+		}>
+	},
+	title: string,
+	description: string,
+	buttonText: string,
+	footer?: string
+): WAMessageContent => {
+	validateListSections(listInfo.sections, buttonText)
+
+	return {
+		listMessage: WAProto.Message.ListMessage.fromObject({
+			title,
+			description,
+			buttonText,
+			footerText: footer,
+			listType: WAProto.Message.ListMessage.ListType.SINGLE_SELECT,
+			sections: listInfo.sections.map(section => ({
+				title: section.title,
+				rows: section.rows.map(row => ({
+					rowId: row.id || row.rowId,
+					title: row.title,
+					description: row.description
+				}))
+			}))
+		})
+	}
+}
+
 export const generateWAMessageContent = async (
 	message: AnyMessageContent,
 	options: MessageContentGenerationOptions
 ) => {
 	let m: WAMessageContent = {}
-	if (hasNonNullishProperty(message, 'text')) {
+
+	// ========== Interactive Messages (must be checked BEFORE 'text' since they also have 'text' property) ==========
+
+	if (hasNonNullishProperty(message, 'nativeButtons')) {
+		const nativeMsg = message as any
+		const buttons = nativeMsg.nativeButtons as any[]
+
+		if (!buttons || buttons.length === 0) {
+			throw new Boom('nativeButtons requires at least one button', { statusCode: 400 })
+		}
+
+		const allQuickReply = buttons.every((btn: any) => btn.type === 'reply')
+
+		if (allQuickReply) {
+			const hasHeaderTitle = !!nativeMsg.headerTitle
+			const buttonsMessage: proto.Message.IButtonsMessage = {
+				contentText: nativeMsg.text || '',
+				footerText: nativeMsg.footer || undefined,
+				headerType: hasHeaderTitle
+					? proto.Message.ButtonsMessage.HeaderType.TEXT
+					: proto.Message.ButtonsMessage.HeaderType.EMPTY,
+				...(hasHeaderTitle ? { text: nativeMsg.headerTitle } : {})
+			}
+			buttonsMessage.buttons = buttons.map((btn: any, idx: number) => ({
+				buttonId: btn.id || `btn_${idx}`,
+				buttonText: { displayText: btn.text || `Button ${idx + 1}` },
+				type: proto.Message.ButtonsMessage.Button.Type.RESPONSE
+			}))
+			m.buttonsMessage = buttonsMessage
+		} else {
+			const buttonOptions: ButtonMessageOptions = {
+				buttons,
+				text: nativeMsg.text || '',
+				footer: nativeMsg.footer,
+				headerTitle: nativeMsg.headerTitle,
+				headerImage: nativeMsg.headerImage,
+				headerVideo: nativeMsg.headerVideo
+			}
+			const generated = await generateButtonMessage(buttonOptions, options)
+			m.viewOnceMessage = generated.viewOnceMessage
+		}
+	} else if (hasNonNullishProperty(message, 'nativeCarousel')) {
+		const carouselMsg = message as any
+		const carouselOptions: CarouselMessageOptions = {
+			cards: carouselMsg.nativeCarousel.cards,
+			title: carouselMsg.nativeCarousel.title || carouselMsg.title,
+			text: carouselMsg.text,
+			footer: carouselMsg.footer
+		}
+		const generated = await generateCarouselMessage(carouselOptions, options)
+		m.interactiveMessage = generated.interactiveMessage
+		return m
+	} else if (hasNonNullishProperty(message, 'nativeList')) {
+		const listMsg = message as any
+		// Use LEGACY format to avoid error 479
+		const generated = generateListMessageLegacy(
+			{ sections: listMsg.nativeList.sections },
+			listMsg.title || '',
+			listMsg.text || '',
+			listMsg.nativeList.buttonText,
+			listMsg.footer
+		)
+		m.listMessage = generated.listMessage
+	} else if (hasNonNullishProperty(message, 'productList')) {
+		const productMsg = message as any
+		const productListOptions: ProductListMessageOptions = {
+			title: productMsg.productList.title,
+			description: productMsg.productList.description,
+			buttonText: productMsg.productList.buttonText,
+			footerText: productMsg.productList.footerText,
+			businessOwnerJid: productMsg.productList.businessOwnerJid,
+			productSections: productMsg.productList.productSections,
+			headerImage: productMsg.productList.headerImage
+		}
+		const generated = generateProductListMessage(productListOptions)
+		m.listMessage = generated.listMessage
+	} else if (hasNonNullishProperty(message, 'productCarousel')) {
+		const productCarouselMsg = message as any
+		const productCarouselOptions: ProductCarouselMessageOptions = {
+			businessOwnerJid: productCarouselMsg.productCarousel.businessOwnerJid,
+			products: productCarouselMsg.productCarousel.products,
+			body: productCarouselMsg.productCarousel.body
+		}
+		const generated = generateProductCarouselMessage(productCarouselOptions)
+		m.viewOnceMessage = generated.viewOnceMessage
+	} else if (hasNonNullishProperty(message, 'text') && hasNonNullishProperty(message, 'buttons')) {
+		const buttonsMessage: proto.Message.IButtonsMessage = {
+			contentText: (message as any).text,
+			footerText: (message as any).footerText,
+			headerType: (message as any).headerType || proto.Message.ButtonsMessage.HeaderType.EMPTY
+		}
+		buttonsMessage.buttons = ((message as any).buttons as any[]).map((btn: any, idx: number) => ({
+			buttonId: btn.buttonId || `btn_${idx}`,
+			buttonText: { displayText: btn.buttonText?.displayText || btn.displayText || btn.text },
+			type: btn.type || proto.Message.ButtonsMessage.Button.Type.RESPONSE
+		}))
+		m.buttonsMessage = buttonsMessage
+	} else if (hasNonNullishProperty(message, 'text') && hasNonNullishProperty(message, 'templateButtons')) {
+		const hydratedButtons = ((message as any).templateButtons as any[]).map((btn: any) => {
+			if (btn.quickReplyButton) {
+				return { index: btn.index, quickReplyButton: btn.quickReplyButton }
+			} else if (btn.urlButton) {
+				return { index: btn.index, urlButton: btn.urlButton }
+			} else if (btn.callButton) {
+				return { index: btn.index, callButton: btn.callButton }
+			}
+
+			return btn
+		})
+
+		const templateMessage: proto.Message.ITemplateMessage = {
+			hydratedTemplate: {
+				hydratedContentText: (message as any).text,
+				hydratedFooterText: (message as any).footer,
+				hydratedButtons
+			}
+		}
+
+		m.templateMessage = templateMessage
+	} else if (hasNonNullishProperty(message, 'sections')) {
+		validateListSections((message as any).sections, (message as any).buttonText)
+		const listMessage: proto.Message.IListMessage = {
+			title: (message as any).title,
+			description: (message as any).text,
+			buttonText: (message as any).buttonText || 'View options',
+			footerText: (message as any).footerText,
+			listType: proto.Message.ListMessage.ListType.SINGLE_SELECT
+		}
+
+		listMessage.sections = ((message as any).sections as any[]).map((section: any) => ({
+			title: section.title,
+			rows: section.rows.map((row: any) => ({
+				rowId: row.rowId || row.id,
+				title: row.title,
+				description: row.description
+			}))
+		}))
+
+		m.listMessage = listMessage
+	} else if (hasNonNullishProperty(message, 'carousel')) {
+		const carousel = (message as any).carousel
+		const interactiveMessage: proto.Message.IInteractiveMessage = {
+			header: carousel.header || { title: carousel.title || 'Carousel', hasMediaAttachment: false },
+			body: { text: (message as any).text || carousel.description || '' },
+			footer: carousel.footer ? { text: carousel.footer } : undefined,
+			carouselMessage: {
+				cards: carousel.cards.map((card: any) => ({
+					header: card.header,
+					body: card.body,
+					footer: card.footer,
+					nativeFlowMessage: card.nativeFlowMessage
+				})),
+				messageVersion: carousel.messageVersion || 1
+			}
+		}
+
+		m.interactiveMessage = interactiveMessage
+	} else if (hasNonNullishProperty(message, 'album')) {
+		const { medias } = message.album
+
+		if (!medias || medias.length < 2) {
+			throw new Boom('Album must have at least 2 media items', { statusCode: 400 })
+		}
+
+		if (medias.length > 10) {
+			throw new Boom('Album cannot have more than 10 media items (WhatsApp limit)', { statusCode: 400 })
+		}
+
+		let expectedImageCount = 0
+		let expectedVideoCount = 0
+
+		for (let i = 0; i < medias.length; i++) {
+			const media = medias[i]
+			if (!media) continue
+
+			if (hasNonNullishProperty(media as AnyMessageContent, 'image')) {
+				expectedImageCount++
+			} else if (hasNonNullishProperty(media as AnyMessageContent, 'video')) {
+				expectedVideoCount++
+			} else {
+				throw new Boom(`Album media at index ${i} must have 'image' or 'video' property`, { statusCode: 400 })
+			}
+		}
+
+		m.albumMessage = WAProto.Message.AlbumMessage.create({
+			expectedImageCount,
+			expectedVideoCount
+		})
+	} else if (hasNonNullishProperty(message, 'text')) {
 		const extContent = { text: message.text } as WATextMessage
 
 		let urlInfo = message.linkPreview
