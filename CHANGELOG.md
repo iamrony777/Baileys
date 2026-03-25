@@ -1,11 +1,18 @@
-# [7.0.0-rc.9-1.1](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.1) (2026-01-04)
+# [7.0.0-rc.9-1.2](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.2) (2026-03-25)
 
 
 ### Bug Fixes
 
+* align noise-handler buffer types for Baileys build ([#2284](/github.com/iamrony777/Baileys/issues/2284)) ([ffc019f](github.com/iamrony777/Baileys/commits/ffc019fb516a467c3639dee291136591e3314f4f))
 * **auth:** resolve concurrency bottleneck causing connection timeouts ([#1858](/github.com/iamrony777/Baileys/issues/1858)) ([55f09e8](github.com/iamrony777/Baileys/commits/55f09e8c84118a8920c94f069c763c3e360f5eee))
+* avoid variable shadowing and preserve empty business profile fields ([#2183](/github.com/iamrony777/Baileys/issues/2183)) ([720cc68](github.com/iamrony777/Baileys/commits/720cc688d6987a0c36a8057a1c90f9f250d7c749))
 * cannot send message on new Whatsapp Business limited accounts ([#2080](/github.com/iamrony777/Baileys/issues/2080)) ([5c456e5](github.com/iamrony777/Baileys/commits/5c456e514e74b64ac281594685dd7b4c137ebe01))
+* detect identity key changes and reset sessions (align with WA Web) ([#2307](/github.com/iamrony777/Baileys/issues/2307)) ([b023901](github.com/iamrony777/Baileys/commits/b02390123a6165eaf1ce6449d040f7c0f9d3f918))
+* example file ([9ac32b4](github.com/iamrony777/Baileys/commits/9ac32b4cb30405298d72d0d59f0fffc9de986a9e))
+* extract LID-PN mappings from conversation objects in history sync ([#2282](/github.com/iamrony777/Baileys/issues/2282)) ([f829b6d](github.com/iamrony777/Baileys/commits/f829b6d7a848f46eb6f52f111309f59050c85ab1))
+* extract LID-PN mappings from history sync phoneNumberToLidMappings ([#2268](/github.com/iamrony777/Baileys/issues/2268)) ([a89736f](github.com/iamrony777/Baileys/commits/a89736f89dd13b8580b4c8fb8cc884c855ba5c70))
 * fallback addressing_mode detection by sender suffix ([#1776](/github.com/iamrony777/Baileys/issues/1776)) ([c8ebdb9](github.com/iamrony777/Baileys/commits/c8ebdb9a0bfbb1b882459e62cf21280b3584ea2f))
+* getmessagetype to ensure consistency with whatsapp behavior ([#2245](/github.com/iamrony777/Baileys/issues/2245)) ([81d9c12](github.com/iamrony777/Baileys/commits/81d9c12e86ca55c14760d8779b8fe72096440571))
 * gracefully handle unavailable view-once messages and improve log error ([#2070](/github.com/iamrony777/Baileys/issues/2070)) ([e5f820d](github.com/iamrony777/Baileys/commits/e5f820d1197d6db501c268873b6046f5ee440eb6))
 * handle invalid signatureKeyPublic types in sender-key-state AND fix handling chain key objects for skmsg group message decryption ([#1760](/github.com/iamrony777/Baileys/issues/1760)) ([f0dcc30](github.com/iamrony777/Baileys/commits/f0dcc30e0f0fc991fc2a79f2d73c7d28460a68c2))
 * Handle undefined results in USync query parser ([#1891](/github.com/iamrony777/Baileys/issues/1891)) ([612c97f](github.com/iamrony777/Baileys/commits/612c97f505498eb40edd6c077007beb700a6a3e5))
@@ -13,39 +20,55 @@
 * improve media upload handling and reduce memory pressure ([#2128](/github.com/iamrony777/Baileys/issues/2128)) ([43d1787](github.com/iamrony777/Baileys/commits/43d178753255986b6a481c1b55cc85c2b88f3d9d))
 * message retries loop  ([#1641](/github.com/iamrony777/Baileys/issues/1641)) ([d2adbaf](github.com/iamrony777/Baileys/commits/d2adbaf3fc7f4071136b023957ca47ac51d7a791))
 * **messages-recv:** cancel pending phone requests for message retries ([#2147](/github.com/iamrony777/Baileys/issues/2147)) ([674f116](github.com/iamrony777/Baileys/commits/674f116b001192232488ea090ddd81cb923251d9))
+* **messages:** enhance nullish value checks in message content generation ([#2180](/github.com/iamrony777/Baileys/issues/2180)) ([0b3b2a8](github.com/iamrony777/Baileys/commits/0b3b2a88cd3137ed488e250fadea60e69d17f2f6))
+* **messages:** handle encryption failures per recipient and fail when all fail ([#2226](/github.com/iamrony777/Baileys/issues/2226)) ([432c26a](github.com/iamrony777/Baileys/commits/432c26a07c43c087e0b70d74b28e7aa7b4cd6f65))
 * No session found to decrypt message and recover lost messages due to this reason ([#1822](/github.com/iamrony777/Baileys/issues/1822)) ([7d5c28c](github.com/iamrony777/Baileys/commits/7d5c28cf72e7744f35ee96c2505e4983c20bba06))
+* optimize getLIDsForPNs and add getPNsForLIDs ([#2274](/github.com/iamrony777/Baileys/issues/2274)) ([52fcad2](github.com/iamrony777/Baileys/commits/52fcad2b9c47294c4e9c441fdd3de446b9190288))
 * optimize LID migration performance and introduce cache ([#1782](/github.com/iamrony777/Baileys/issues/1782)) ([194b557](github.com/iamrony777/Baileys/commits/194b557b0f3f4aacfa4d5feecf5541f19c646e67))
+* **proto-extract:** regenerate corrupted yarn.lock to restore install process ([#1981](/github.com/iamrony777/Baileys/issues/1981)) ([db86cdc](github.com/iamrony777/Baileys/commits/db86cdc5451c2fd81102ddd87fc8f4f51a52f595))
+* request placeholder resend for messages without encryption (CTWAads) ([#2334](/github.com/iamrony777/Baileys/issues/2334)) ([7a5b090](github.com/iamrony777/Baileys/commits/7a5b09061664f5c37d60faebc7771042b26fb059))
+* resolve race condition in decodeFrame handling and improve encryption integrity ([#2182](/github.com/iamrony777/Baileys/issues/2182)) ([5887551](github.com/iamrony777/Baileys/commits/5887551d682ca11ad3196d62c83d0d39ac24c760))
 * send message speed, lid logic, remove messages-send useless functions ([#1794](/github.com/iamrony777/Baileys/issues/1794)) ([ae456cb](github.com/iamrony777/Baileys/commits/ae456cb3429314fe9b2765a161c9a89e1b861d4d))
 * set duplex property when uploading media to server ([#1837](/github.com/iamrony777/Baileys/issues/1837)) ([9f6e1d9](github.com/iamrony777/Baileys/commits/9f6e1d954f9a44d4e257917e89186e7d6e4c217a))
+* skip retry for expired status messages over 24 hours old ([#2280](/github.com/iamrony777/Baileys/issues/2280)) ([92d4198](github.com/iamrony777/Baileys/commits/92d4198ff174a41a41779e352da0331229088088))
 * **socket:** Prevent crashes from timeouts and fix memory leak ([#1627](/github.com/iamrony777/Baileys/issues/1627)) ([0fbce52](github.com/iamrony777/Baileys/commits/0fbce52fd3ba3ca430a94a0f1314c229c072a617))
+* store LID-PN mapping from contactAction sync ([#2266](/github.com/iamrony777/Baileys/issues/2266)) ([8ff01b8](github.com/iamrony777/Baileys/commits/8ff01b8bb32a6128e9510b4c44f49b02a34e8bd5))
 * suppress receipts for newsletter messages to prevent disconnection ([#2071](/github.com/iamrony777/Baileys/issues/2071)) ([9b012ba](github.com/iamrony777/Baileys/commits/9b012baa5c09fa80ca37a765b41d16c0c5c85e7d))
 * sync pre-keys on socket start and add specific pre-key error approach ([#1663](/github.com/iamrony777/Baileys/issues/1663)) ([8f21a67](github.com/iamrony777/Baileys/commits/8f21a67e4ad3c027a9c83ef64417bf63462e308e))
+* **utils.normalizeMessageContent:** add associatedChildMessage as one of the options to normalize ([#1874](/github.com/iamrony777/Baileys/issues/1874)) ([a1d69f7](github.com/iamrony777/Baileys/commits/a1d69f72c95b94eb6ab5e1ce0b341bdb6bf8cf60))
+* **WAProto:** Handle string values in long fields during JSON serialization ([#1991](/github.com/iamrony777/Baileys/issues/1991)) ([9611a1a](github.com/iamrony777/Baileys/commits/9611a1a982d21ad3b661b68c5b632cd4b8ea177f))
 
 
 ### Features
 
 * add enable/disable link preview privacy ([#1675](/github.com/iamrony777/Baileys/issues/1675)) ([aba3ecf](github.com/iamrony777/Baileys/commits/aba3ecf9693dc4caa31151b3553778cdbedd77cb))
 * add expiration key in group message ([#1790](/github.com/iamrony777/Baileys/issues/1790)) ([7b0e39f](github.com/iamrony777/Baileys/commits/7b0e39f44310a54709a9baa3deb4935c2e88a11f))
+* add interactive message support (buttons, lists, carousels, albums) ([e6652d8](github.com/iamrony777/Baileys/commits/e6652d83dcac2f6128ba9835cd3425dca5841c05))
+* add support for FB and Interop JID encoding/decoding and empty strings ([#2189](/github.com/iamrony777/Baileys/issues/2189)) ([c392d4c](github.com/iamrony777/Baileys/commits/c392d4ce6cd461a480d38fb7332aa40b94718fce))
 * **appstate:** emit setting events ([#2057](/github.com/iamrony777/Baileys/issues/2057)) ([925ed6a](github.com/iamrony777/Baileys/commits/925ed6a7b3603031b8b7ac35e7a01d2ec22c9bd0))
 * **business:** change profile/cover photo and manage quick replies ([#1724](/github.com/iamrony777/Baileys/issues/1724)) ([50fc83b](github.com/iamrony777/Baileys/commits/50fc83b0086f2f1592135dab670fc546c4731ec9))
+* **call:** add caller phone number to offer call event ([#2190](/github.com/iamrony777/Baileys/issues/2190)) ([23156c8](github.com/iamrony777/Baileys/commits/23156c833ebbe5d328e66d884d7d44bb40b81821))
 * event buffer should use logger.debug instead of logger.info ([#1689](/github.com/iamrony777/Baileys/issues/1689)) ([be3d869](github.com/iamrony777/Baileys/commits/be3d869cae5866ccf512de0364db01e188b34fac))
 * eventMessage sending / call link creation ([#1677](/github.com/iamrony777/Baileys/issues/1677)) ([084761d](github.com/iamrony777/Baileys/commits/084761dc31278490398be758bc6d84635bf4f082))
 * **events:** decrypt event responses ([#2056](/github.com/iamrony777/Baileys/issues/2056)) ([40f128d](github.com/iamrony777/Baileys/commits/40f128d88aa6a16c3015e3eb7db1a76d2441b0ff))
+* groups mention all  ([#2396](/github.com/iamrony777/Baileys/issues/2396)) ([6afde71](github.com/iamrony777/Baileys/commits/6afde71691c2d0fd0c8f5ae4fffa58368ad0fad5))
+* implement automated WhatsApp version update workflow and related scripts ([#2130](/github.com/iamrony777/Baileys/issues/2130)) ([d4ef73a](github.com/iamrony777/Baileys/commits/d4ef73aca5a1ac847db707a9c537f2fe2669401c))
 * Mutex redesign - isolate event processing for better ordering and throughput ([#2137](/github.com/iamrony777/Baileys/issues/2137)) ([829fa8d](github.com/iamrony777/Baileys/commits/829fa8d601a1dbb390ac9a77fde6c61f9732c2a2))
 * Optimize Offline Node Processing with Batching and Event Loop Yielding ([#2138](/github.com/iamrony777/Baileys/issues/2138)) ([b7960db](github.com/iamrony777/Baileys/commits/b7960dbb9a3c9385ab1f04c002b4fa50573f8ac6))
+* replace async crypto with sync Rust WASM for app state sync ([#2315](/github.com/iamrony777/Baileys/issues/2315)) ([b5c1741](github.com/iamrony777/Baileys/commits/b5c174111f38039b511bff4a0c75d51aa03b4ebe))
+* send tctoken to profile update and presence subscribe ([#2257](/github.com/iamrony777/Baileys/issues/2257)) ([349e7bd](github.com/iamrony777/Baileys/commits/349e7bd771c6ddcfa34687d57b8be359c288867b))
+* send unified session ([#2294](/github.com/iamrony777/Baileys/issues/2294)) ([d514764](github.com/iamrony777/Baileys/commits/d514764686dd6edda58cf5fa982cf424e38ba641))
 * **signal:** better parity with whatsapp web ([#1967](/github.com/iamrony777/Baileys/issues/1967)) ([a70e4da](github.com/iamrony777/Baileys/commits/a70e4da1c42ee5f6ceedb92470efbac37bdb1561))
+* Verify leaf signature ([#2208](/github.com/iamrony777/Baileys/issues/2208)) ([4e681d3](github.com/iamrony777/Baileys/commits/4e681d32194b5f11e9f9b55a7059d98e3df99694))
 * **WAProto:** Optimize protobuf generation for 80%+ bundle size reduction ([#1665](/github.com/iamrony777/Baileys/issues/1665)) ([4d4339d](github.com/iamrony777/Baileys/commits/4d4339dae67cba6275b8552e76983868011e883a))
 
 
 ### Performance Improvements
 
 * **addTransactionCapability:** streamline transaction handling and improve concurrency control ([#1887](/github.com/iamrony777/Baileys/issues/1887)) ([051b5fc](github.com/iamrony777/Baileys/commits/051b5fc220edfcafbeed422b289311f74c2b94a7))
-
-
+* reduce DB calls during sync with caching and batching ([#2316](/github.com/iamrony777/Baileys/issues/2316)) ([fa2a837](github.com/iamrony777/Baileys/commits/fa2a837a4acefa859f5b4f86d02125b91eb0b9b1))
 
 ## [6.7.19-3](github.com/iamrony777/Baileys/compare/v6.7.19-2...v6.7.19-3) (2025-08-13)
-
-
 
 ## [6.7.19-2](github.com/iamrony777/Baileys/compare/v6.7.19-1...v6.7.19-2) (2025-08-01)
 
@@ -73,8 +96,6 @@
 * community support ([#1157](/github.com/iamrony777/Baileys/issues/1157)) ([0c20166](github.com/iamrony777/Baileys/commits/0c20166a45fde4581e190f3a6bf638faa28c612f))
 * extra metadata on groupMetadata ([#1374](/github.com/iamrony777/Baileys/issues/1374)) ([99bbafe](github.com/iamrony777/Baileys/commits/99bbafeae51d660534450ff30b223548171ba273))
 
-
-
 ## [6.7.19-1](github.com/iamrony777/Baileys/compare/v6.7.19-0...v6.7.19-1) (2025-06-15)
 
 
@@ -82,11 +103,7 @@
 
 * readme ([d034232](github.com/iamrony777/Baileys/commits/d034232f2562dbaeec9b7eb6521eadcb87efbbfe))
 
-
-
 ## [6.7.19-0](github.com/iamrony777/Baileys/compare/v6.7.18...v6.7.19-0) (2025-06-08)
-
-
 
 ## [6.7.18](github.com/iamrony777/Baileys/compare/v6.7.17-1...v6.7.18) (2025-06-03)
 
@@ -105,15 +122,9 @@
 * send message to lid groups ([a4338fa](github.com/iamrony777/Baileys/commits/a4338fac12a54a36890845c99abd56e92b88cdf6))
 * simplify domainType ([f4dc41e](github.com/iamrony777/Baileys/commits/f4dc41eda10b01e638c85d434a9db4822467ee0d))
 
-
-
 ## [6.7.17-1](github.com/iamrony777/Baileys/compare/v6.7.17-0...v6.7.17-1) (2025-04-08)
 
-
-
 ## [6.7.17-0](github.com/iamrony777/Baileys/compare/v6.7.16...v6.7.17-0) (2025-04-08)
-
-
 
 ## [6.7.16](github.com/iamrony777/Baileys/compare/v6.7.9-2...v6.7.16) (2025-03-30)
 
@@ -133,8 +144,6 @@
 * add Id support for desktop ([#1240](/github.com/iamrony777/Baileys/issues/1240)) ([89b28a4](github.com/iamrony777/Baileys/commits/89b28a438bd95d297ccfdb72a3e385bd59a62a75))
 * add last message in chat.update event if is real message ([#1203](/github.com/iamrony777/Baileys/issues/1203)) ([ae60f3f](github.com/iamrony777/Baileys/commits/ae60f3fe62bb05a97111c5145fa247492f40ddae))
 * add per-jid patching ([e1aadc5](github.com/iamrony777/Baileys/commits/e1aadc5546c6bf8ee8c299e4b88b254bcc0cdeaa))
-
-
 
 ## [6.7.9-2](github.com/iamrony777/Baileys/compare/v6.7.7-1...v6.7.9-2) (2025-01-06)
 
@@ -206,8 +215,6 @@
 * Revert "Update module to latest version  (#926)" ([4594997](github.com/iamrony777/Baileys/commits/45949972e173741d5e0b82bc44317e620b861460)), closes [#926](github.com/iamrony777/Baileys/issues/926)
 * Revert "fix: inefficient method of extracting url from text (#741)" (#748) ([d91967a](github.com/iamrony777/Baileys/commits/d91967aa1c025f96336dbe8e390ae38ed6845566)), closes [#741](github.com/iamrony777/Baileys/issues/741) [#748](github.com/iamrony777/Baileys/issues/748) [#741](github.com/iamrony777/Baileys/issues/741)
 
-
-
 # [6.5.0-10](github.com/iamrony777/Baileys/compare/v6.5.0-8...v6.5.0-10) (2024-01-16)
 
 
@@ -215,23 +222,13 @@
 
 * Fix linting ([cbffb29](github.com/iamrony777/Baileys/commits/cbffb2941cd7e61142a25ef9e58149230621db36))
 
-
-
 # [6.5.0-8](github.com/iamrony777/Baileys/compare/v6.5.0-7...v6.5.0-8) (2023-12-16)
-
-
 
 # [6.5.0-7](github.com/iamrony777/Baileys/compare/v6.5.0-6...v6.5.0-7) (2023-11-13)
 
-
-
 # [6.5.0-2](github.com/iamrony777/Baileys/compare/v6.5.0-1...v6.5.0-2) (2023-11-02)
 
-
-
 # [6.5.0-1](github.com/iamrony777/Baileys/compare/v6.4.1...v6.5.0-1) (2023-11-02)
-
-
 
 ## [6.4.1](github.com/iamrony777/Baileys/compare/v6.4.0...v6.4.1) (2023-08-27)
 
@@ -241,8 +238,6 @@
 * do not send message to self if the device is 0 (mobile) ([64349ca](github.com/iamrony777/Baileys/commits/64349cac15fad8fa9bb1ace741d161ec8b5c140d))
 * registration + add captcha support ([#227](/github.com/iamrony777/Baileys/issues/227)) ([49ab16f](github.com/iamrony777/Baileys/commits/49ab16f5925789b85219bec2f35686234dab08a0))
 * Use new useragent and token for mobile ([a6bc59f](github.com/iamrony777/Baileys/commits/a6bc59f3f0957e83657c9d1e9f4b41fd36542e26))
-
-
 
 # [6.4.0](github.com/iamrony777/Baileys/compare/v6.3.1...v6.4.0) (2023-07-18)
 
@@ -260,8 +255,6 @@
 * Send Status (status@broadcast) {text, media, audio(with waveform)} ([#249](/github.com/iamrony777/Baileys/issues/249)) ([cba9827](github.com/iamrony777/Baileys/commits/cba982785159ff10816ee067363031644c4e197d))
 * Whatsapp v2.2329.9 proto/version change ([#169](/github.com/iamrony777/Baileys/issues/169)) ([a84f75e](github.com/iamrony777/Baileys/commits/a84f75ef2a3af231454efca28bdf3d590a751812))
 
-
-
 ## [6.3.1](github.com/iamrony777/Baileys/compare/v6.3.0...v6.3.1) (2023-07-08)
 
 
@@ -271,8 +264,6 @@
 * Added jid of people who added to the group ([#223](/github.com/iamrony777/Baileys/issues/223)) ([c2d88fd](github.com/iamrony777/Baileys/commits/c2d88fddc605f07f4d6990e0d705e3e65140d439))
 * fix edit message ([#192](/github.com/iamrony777/Baileys/issues/192)) ([8e1e9b9](github.com/iamrony777/Baileys/commits/8e1e9b9386af7d36601a35eb7ca327eefd36efc8))
 * Fixed ephemeral message visual bug ([#185](/github.com/iamrony777/Baileys/issues/185)) ([a683cbe](github.com/iamrony777/Baileys/commits/a683cbe633eccaa961852b49aa80dc41c54b17a8))
-
-
 
 # [6.3.0](github.com/iamrony777/Baileys/compare/v6.2.1...v6.3.0) (2023-06-17)
 
@@ -293,16 +284,12 @@
 * Added makeCacheManagerAuthState Implementation ([#109](/github.com/iamrony777/Baileys/issues/109)) ([df6b318](github.com/iamrony777/Baileys/commits/df6b31847282c10b884c69ffe39ca0e93a76b603))
 * approve, reject, list request join ([#117](/github.com/iamrony777/Baileys/issues/117)) ([7dc1cd6](github.com/iamrony777/Baileys/commits/7dc1cd64766b41f4fc9a3210777533e16fede94f))
 
-
-
 ## [6.2.1](github.com/iamrony777/Baileys/compare/v6.2.0...v6.2.1) (2023-06-07)
 
 
 ### Bug Fixes
 
 * updated proto/version to v2.2323.4 ([#96](/github.com/iamrony777/Baileys/issues/96)) ([63575e9](github.com/iamrony777/Baileys/commits/63575e9b85520bd7621bd16ac0508cdd523a3a43))
-
-
 
 # [6.2.0](github.com/iamrony777/Baileys/compare/v6.1.0...v6.2.0) (2023-06-07)
 
@@ -328,8 +315,6 @@
 
 * example logger ([d9a4dae](github.com/iamrony777/Baileys/commits/d9a4dae23580444b87384f62d71b4d78fd84df4d))
 
-
-
 # [6.1.0](github.com/iamrony777/Baileys/compare/v6.0.1...v6.1.0) (2023-05-26)
 
 
@@ -346,8 +331,6 @@
 * **labels:** modify chat utils ([38f2857](github.com/iamrony777/Baileys/commits/38f285760df426314b75ed752f1edcd6f23e9d23))
 * **store/labels:** add ability to store and query labels ([ce019dc](github.com/iamrony777/Baileys/commits/ce019dcf0f0e3c3f1a8c57b776aa5fe39854b598))
 
-
-
 ## [6.0.1](github.com/iamrony777/Baileys/compare/v6.0.0...v6.0.1) (2023-05-18)
 
 
@@ -355,8 +338,6 @@
 
 * get poll request from getAggregateVotesInPollMessage in v1 v2 v3 ([#74](/github.com/iamrony777/Baileys/issues/74)) ([7f60f16](github.com/iamrony777/Baileys/commits/7f60f163e667b3aee769b1624adc4abf057502ba))
 * In memory store: normalize user when asserting message list to update messages ([#49](/github.com/iamrony777/Baileys/issues/49)) ([7b4abcd](github.com/iamrony777/Baileys/commits/7b4abcdb231434c08c14dbb5879cd1fd4939fc41))
-
-
 
 # [6.0.0](github.com/iamrony777/Baileys/compare/07291d8ef69c886bd1aefb3b474a8b7553daebad...v6.0.0) (2023-05-10)
 
@@ -770,6 +751,3 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](github.com/iamrony777/Baileys/commits/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](github.com/iamrony777/Baileys/commits/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](github.com/iamrony777/Baileys/commits/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-
-
-

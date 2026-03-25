@@ -156,7 +156,7 @@ export default (config: BaileysInMemoryStoreConfig) => {
 					const contactHashes = await Promise.all(
 						Object.keys(contacts).map(async contactId => {
 							const { user } = jidDecode(contactId)!
-							return [contactId, (await md5(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8'))).toString('base64').slice(0, 3)]
+							return [contactId, (await md5(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8'))).toString().slice(0, 3)]
 						})
 					)
 					contact = contacts[contactHashes.find(([, b]) => b === update.id)?.[0] || ''] as Contact // find contact by attrs.hash, when user is not saved as a contact

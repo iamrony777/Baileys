@@ -1,7 +1,7 @@
 {
   "name": "@iamrony777/baileys",
   "type": "module",
-  "version": "7.0.0-rc.9-1.1",
+  "version": "7.0.0-rc.9-1.2",
   "description": "A WebSockets library for interacting with WhatsApp Web",
   "keywords": [
     "whatsapp",
@@ -21,7 +21,7 @@
   ],
   "homepage": "https://github.com/iamrony777/Baileys",
   "repository": {
-    "url": "git@github.com:iamrony777/Baileys.git"
+    "url": "git+ssh://git@github.com/iamrony777/Baileys.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
