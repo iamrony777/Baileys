@@ -1,8 +1,9 @@
-# [7.0.0-rc.9-1.2](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.2) (2026-03-25)
+# [7.0.0-rc.9-1.3](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.3) (2026-03-27)
 
 
 ### Bug Fixes
 
+* `PreKeyWhisperMessage` is not an exported member ([96b2716](github.com/iamrony777/Baileys/commits/96b2716cbac7e057a2c1754281ed78eac6547ba7))
 * align noise-handler buffer types for Baileys build ([#2284](/github.com/iamrony777/Baileys/issues/2284)) ([ffc019f](github.com/iamrony777/Baileys/commits/ffc019fb516a467c3639dee291136591e3314f4f))
 * **auth:** resolve concurrency bottleneck causing connection timeouts ([#1858](/github.com/iamrony777/Baileys/issues/1858)) ([55f09e8](github.com/iamrony777/Baileys/commits/55f09e8c84118a8920c94f069c763c3e360f5eee))
 * avoid variable shadowing and preserve empty business profile fields ([#2183](/github.com/iamrony777/Baileys/issues/2183)) ([720cc68](github.com/iamrony777/Baileys/commits/720cc688d6987a0c36a8057a1c90f9f250d7c749))
