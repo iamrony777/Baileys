@@ -31,9 +31,9 @@ import {
 	generateParticipantHashV2,
 	generateWAMessage,
 	getStatusCodeForMediaRetry,
-	hasNonNullishProperty,
 	getUrlFromDirectPath,
 	getWAUploadToServer,
+	hasNonNullishProperty,
 	MessageRetryManager,
 	normalizeMessageContent,
 	parseAndInjectE2ESessions,
@@ -1593,10 +1593,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				return delayConfig
 			}
 
-			const sendMediaWithRetry = async (
-				media: AlbumMediaItem,
-				index: number
-			): Promise<AlbumMediaResult> => {
+			const sendMediaWithRetry = async (media: AlbumMediaItem, index: number): Promise<AlbumMediaResult> => {
 				const itemStartTime = Date.now()
 				let lastError: Error | undefined
 				let attempts = 0
@@ -1731,10 +1728,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		sendMessage: async (jid: string, content: AnyMessageContent, options: MiscMessageGenerationOptions = {}) => {
 			// Album messages must use sendAlbumMessage instead
 			if (typeof content === 'object' && 'album' in content) {
-				throw new Boom(
-					'Cannot send album messages with sendMessage(). Use sendAlbumMessage() instead.',
-					{ statusCode: 400 }
-				)
+				throw new Boom('Cannot send album messages with sendMessage(). Use sendAlbumMessage() instead.', {
+					statusCode: 400
+				})
 			}
 
 			const userJid = authState.creds.me!.id

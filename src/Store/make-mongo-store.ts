@@ -378,7 +378,7 @@ export default ({ logger: _logger, socket, db, filterChats, autoDeleteStatusMess
 		})
 
 		ev.on('chats.upsert', async newChats => {
-			if (!newChats || !newChats.length) {
+			if (!newChats?.length) {
 				logger.debug('no chats to upsert')
 				return
 			}

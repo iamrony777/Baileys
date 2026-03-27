@@ -1,7 +1,8 @@
 // @ts-ignore
 import * as libsignal from 'libsignal'
 // @ts-ignore
-import { PreKeyWhisperMessage } from 'libsignal/src/protobufs'
+import protobufs from 'libsignal/src/protobufs'
+const { PreKeyWhisperMessage } = protobufs
 import { LRUCache } from 'lru-cache'
 import type { LIDMapping, SignalAuthState, SignalKeyStoreWithTransaction } from '../Types'
 import type { SignalRepositoryWithLIDStore } from '../Types/Signal'
@@ -456,9 +457,7 @@ function signalStorage(
 			const { [wireJid]: existingKey } = await keys.get('identity-key', [wireJid])
 
 			const keysMatch =
-				existingKey &&
-				existingKey.length === identityKey.length &&
-				existingKey.every((byte, i) => byte === identityKey[i])
+				existingKey?.length === identityKey.length && existingKey.every((byte, i) => byte === identityKey[i])
 
 			if (existingKey && !keysMatch) {
 				// Identity changed - clear session and update key

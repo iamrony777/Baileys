@@ -807,7 +807,15 @@ export const generateListMessage = (options: ListMessageOptions): WAMessageConte
  * Generates a product list message (multi-product) from the WhatsApp Business catalog
  */
 export const generateProductListMessage = (options: ProductListMessageOptions): WAMessageContent => {
-	const { title: listTitle, description, buttonText, footerText, businessOwnerJid, productSections, headerImage } = options
+	const {
+		title: listTitle,
+		description,
+		buttonText,
+		footerText,
+		businessOwnerJid,
+		productSections,
+		headerImage
+	} = options
 
 	validateNonEmptyString(listTitle, 'title')
 	validateNonEmptyString(description, 'description')
