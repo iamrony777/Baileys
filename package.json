@@ -105,10 +105,11 @@
     "link-preview-js": "^4.0.0",
     "lru-cache": "^11.1.0",
     "music-metadata": "^11.7.0",
+    "p-queue": "^9.0.0",
     "pino": "^9.6",
     "protobufjs": "^7.2.4",
     "sharp": "*",
-    "whatsapp-rust-bridge": "0.5.2",
+    "whatsapp-rust-bridge": "0.5.3",
     "ws": "^8.13.0"
   },
   "devDependencies": {
@@ -145,7 +146,7 @@
     "typedoc": "^0.27.9",
     "typedoc-plugin-markdown": "4.4.2",
     "typescript": "^5.8.2",
-    "whatsapp-rust-bridge": "0.5.2"
+    "whatsapp-rust-bridge": "0.5.3"
   },
   "peerDependenciesMeta": {
     "audio-decode": {
