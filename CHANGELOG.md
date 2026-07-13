@@ -1,4 +1,56 @@
+# [7.0.0-rc13-1](github.com/iamrony777/Baileys/compare/v7.0.0-rc.9-1.4...v7.0.0-rc13-1) (2026-07-13)
+
+
+### Bug Fixes
+
+* add Long type import ([#2586](/github.com/iamrony777/Baileys/issues/2586)) ([78e7e4e](github.com/iamrony777/Baileys/commits/78e7e4e2cfcb1935629173427bc3292b95f61a95))
+* App state sync resilience — skip undecryptable records instead of aborting ([#2456](/github.com/iamrony777/Baileys/issues/2456)) ([0956f51](github.com/iamrony777/Baileys/commits/0956f51f9659b083edfca79ea02bc50958f54754)), closes [#2350](github.com/iamrony777/Baileys/issues/2350)
+* **decode:** mark peer-routed self stanzas as fromMe ([5ddc231](github.com/iamrony777/Baileys/commits/5ddc231fe359148cda33d2d234253b17fba3752d))
+* guard fetch dispatcher option ([#2557](/github.com/iamrony777/Baileys/issues/2557)) ([28ca087](github.com/iamrony777/Baileys/commits/28ca087cf1cbe3c05a5b704d67b3e2270d647b74))
+* harden null/undefined paths in message and group handling ([#1892](/github.com/iamrony777/Baileys/issues/1892)) ([798f2a9](github.com/iamrony777/Baileys/commits/798f2a93b9abc0266ba1affd8a9fed35f3be6943))
+* nest profile picture tc token ([#2607](/github.com/iamrony777/Baileys/issues/2607)) ([731cd6b](github.com/iamrony777/Baileys/commits/731cd6b5d1991a16d0c65072fd3107c43968e4a9))
+* **newsletter:** process multiple messages in a single notification stanza ([#2482](/github.com/iamrony777/Baileys/issues/2482)) ([b0c568e](github.com/iamrony777/Baileys/commits/b0c568eb05897aa2ec545497219edce5c5e25c18))
+* **process-message:** only drop self-only protocolMessages from non-self senders ([3beb08e](github.com/iamrony777/Baileys/commits/3beb08eecfcb4e65722e674034bd84fb11a9de35))
+* repair broken redirect retry counter in link preview ([#2463](/github.com/iamrony777/Baileys/issues/2463)) ([bae7ead](github.com/iamrony777/Baileys/commits/bae7ead6249ed6a5cf28b1422ce1c90b78398303))
+* **retry:** process <keys> bundle and embed SKDM on resend ([#2506](/github.com/iamrony777/Baileys/issues/2506)) ([#2507](/github.com/iamrony777/Baileys/issues/2507)) ([1b16859](github.com/iamrony777/Baileys/commits/1b168592dede854d9fbd75e85f3f945217732bb2))
+
+
+### Features
+
+* add android browser (can receive viewonce) ([#2201](/github.com/iamrony777/Baileys/issues/2201)) ([75d6588](github.com/iamrony777/Baileys/commits/75d6588b7fac17c596de8ec2d7d1d91126947d3f))
+* add cleanup handlers to prevent memory leaks on socket close ([#2191](/github.com/iamrony777/Baileys/issues/2191)) ([3730684](github.com/iamrony777/Baileys/commits/3730684ed16f36bee8b84524dc8e3969d5302f69))
+* add companion registration utilities ([#2460](/github.com/iamrony777/Baileys/issues/2460)) ([de80aab](github.com/iamrony777/Baileys/commits/de80aab1b39ff5a4b5ba17c6852963f3bece8b6a))
+* Add support for `pastParticipants` in history sync ([#2426](/github.com/iamrony777/Baileys/issues/2426)) ([eab00d7](github.com/iamrony777/Baileys/commits/eab00d781727a62d1aebadea394aca9c7dddbdf1))
+* expose group online count in presence updates ([#2545](/github.com/iamrony777/Baileys/issues/2545)) ([6cb7d34](github.com/iamrony777/Baileys/commits/6cb7d3496d3bb488153a65d1d10eb6f4e8ccf8a4))
+* handle devices notification ([#2436](/github.com/iamrony777/Baileys/issues/2436)) ([800042f](github.com/iamrony777/Baileys/commits/800042f404e19392eea74b25cf18bf2c49f5d2d1))
+* server-push mex notification dispatch (reachout timelock + message capping) ([#2445](/github.com/iamrony777/Baileys/issues/2445)) ([c89d97b](github.com/iamrony777/Baileys/commits/c89d97b13bba1be067c1df5a1276a760dcbcd0c9))
+
 # [7.0.0-rc.9-1.4](github.com/iamrony777/Baileys/compare/v7.0.0-rc.9-1.3...v7.0.0-rc.9-1.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* **chats:** add validation for jid and pn_jid in updateBlockStatus ([#2265](/github.com/iamrony777/Baileys/issues/2265)) ([8ca9316](github.com/iamrony777/Baileys/commits/8ca9316a10df16534e39ff1a7adc6da85cf36030))
+* **chats:** update abprops query to fix bad-request error ([#2473](/github.com/iamrony777/Baileys/issues/2473)) ([3451ade](github.com/iamrony777/Baileys/commits/3451ade8c3e6cd4d2a4100bc23e9c07bfacecb79))
+* duplicate imports in chats.ts ([#2496](/github.com/iamrony777/Baileys/issues/2496)) ([ca61ac1](github.com/iamrony777/Baileys/commits/ca61ac14d8f62b8dfdabf14ac3d62786b462faba))
+* improve app state sync resilience (verified against WA Web) ([#2350](/github.com/iamrony777/Baileys/issues/2350)) ([ac90a2d](github.com/iamrony777/Baileys/commits/ac90a2d765cb3e431054cefb5afaf5f225b74fbf))
+* pin music-metadata to 11.12.1 to avoid missing TypeScript declar… ([#2413](/github.com/iamrony777/Baileys/issues/2413)) ([1453b06](github.com/iamrony777/Baileys/commits/1453b06b09934cfeea9d38ffe30297ad09198b5f))
+* respect caller-provided waveform for PTT audio messages ([#2443](/github.com/iamrony777/Baileys/issues/2443)) ([8e5093c](github.com/iamrony777/Baileys/commits/8e5093c198de5c5c0230a76e8a7224f6006ebb2e))
+* streamline JID handling by removing redundant checks and acknowledgments ([#2352](/github.com/iamrony777/Baileys/issues/2352)) ([c727b42](github.com/iamrony777/Baileys/commits/c727b42605ec0aa9ac45ee58c64af00e87baa6b5))
+
+
+### Features
+
+* add initial username INBOUND and Usync support ([#2480](/github.com/iamrony777/Baileys/issues/2480)) ([25a4ef7](github.com/iamrony777/Baileys/commits/25a4ef73dfb31b20b01e4fd971ff51b58689e6d1))
+* album message sending ([#2058](/github.com/iamrony777/Baileys/issues/2058)) ([d981196](github.com/iamrony777/Baileys/commits/d9811963d25dcb3cc98f7c254db91e7995c86eaa))
+* complete tctoken lifecycle with expiration, pruning and re-issuance ([#2339](/github.com/iamrony777/Baileys/issues/2339)) ([402f479](github.com/iamrony777/Baileys/commits/402f479ee8535fa20fa77f6913877a49625f116f))
+
+
+### Performance Improvements
+
+* optimize history sync memory and CPU usage ([#2333](/github.com/iamrony777/Baileys/issues/2333)) ([77c8d3f](github.com/iamrony777/Baileys/commits/77c8d3f718f0cdd46d96f4f7d3de22d30c0cd5bc))
+
+# [7.0.0-rc.9-1.3](github.com/iamrony777/Baileys/compare/v6.7.19-3...v7.0.0-rc.9-1.3) (2026-03-27)
 
 
 ### Bug Fixes
@@ -8,10 +60,7 @@
 * **auth:** resolve concurrency bottleneck causing connection timeouts ([#1858](/github.com/iamrony777/Baileys/issues/1858)) ([55f09e8](github.com/iamrony777/Baileys/commits/55f09e8c84118a8920c94f069c763c3e360f5eee))
 * avoid variable shadowing and preserve empty business profile fields ([#2183](/github.com/iamrony777/Baileys/issues/2183)) ([720cc68](github.com/iamrony777/Baileys/commits/720cc688d6987a0c36a8057a1c90f9f250d7c749))
 * cannot send message on new Whatsapp Business limited accounts ([#2080](/github.com/iamrony777/Baileys/issues/2080)) ([5c456e5](github.com/iamrony777/Baileys/commits/5c456e514e74b64ac281594685dd7b4c137ebe01))
-* **chats:** add validation for jid and pn_jid in updateBlockStatus ([#2265](/github.com/iamrony777/Baileys/issues/2265)) ([8ca9316](github.com/iamrony777/Baileys/commits/8ca9316a10df16534e39ff1a7adc6da85cf36030))
-* **chats:** update abprops query to fix bad-request error ([#2473](/github.com/iamrony777/Baileys/issues/2473)) ([3451ade](github.com/iamrony777/Baileys/commits/3451ade8c3e6cd4d2a4100bc23e9c07bfacecb79))
 * detect identity key changes and reset sessions (align with WA Web) ([#2307](/github.com/iamrony777/Baileys/issues/2307)) ([b023901](github.com/iamrony777/Baileys/commits/b02390123a6165eaf1ce6449d040f7c0f9d3f918))
-* duplicate imports in chats.ts ([#2496](/github.com/iamrony777/Baileys/issues/2496)) ([ca61ac1](github.com/iamrony777/Baileys/commits/ca61ac14d8f62b8dfdabf14ac3d62786b462faba))
 * example file ([9ac32b4](github.com/iamrony777/Baileys/commits/9ac32b4cb30405298d72d0d59f0fffc9de986a9e))
 * extract LID-PN mappings from conversation objects in history sync ([#2282](/github.com/iamrony777/Baileys/issues/2282)) ([f829b6d](github.com/iamrony777/Baileys/commits/f829b6d7a848f46eb6f52f111309f59050c85ab1))
 * extract LID-PN mappings from history sync phoneNumberToLidMappings ([#2268](/github.com/iamrony777/Baileys/issues/2268)) ([a89736f](github.com/iamrony777/Baileys/commits/a89736f89dd13b8580b4c8fb8cc884c855ba5c70))
@@ -21,7 +70,6 @@
 * handle invalid signatureKeyPublic types in sender-key-state AND fix handling chain key objects for skmsg group message decryption ([#1760](/github.com/iamrony777/Baileys/issues/1760)) ([f0dcc30](github.com/iamrony777/Baileys/commits/f0dcc30e0f0fc991fc2a79f2d73c7d28460a68c2))
 * Handle undefined results in USync query parser ([#1891](/github.com/iamrony777/Baileys/issues/1891)) ([612c97f](github.com/iamrony777/Baileys/commits/612c97f505498eb40edd6c077007beb700a6a3e5))
 * harden Protobuf Deserialization and Refactor Utilities ([#1820](/github.com/iamrony777/Baileys/issues/1820)) ([3b46d43](github.com/iamrony777/Baileys/commits/3b46d43bebe2a69a4f910f1757d8d58a2157fb71))
-* improve app state sync resilience (verified against WA Web) ([#2350](/github.com/iamrony777/Baileys/issues/2350)) ([ac90a2d](github.com/iamrony777/Baileys/commits/ac90a2d765cb3e431054cefb5afaf5f225b74fbf))
 * improve media upload handling and reduce memory pressure ([#2128](/github.com/iamrony777/Baileys/issues/2128)) ([43d1787](github.com/iamrony777/Baileys/commits/43d178753255986b6a481c1b55cc85c2b88f3d9d))
 * message retries loop  ([#1641](/github.com/iamrony777/Baileys/issues/1641)) ([d2adbaf](github.com/iamrony777/Baileys/commits/d2adbaf3fc7f4071136b023957ca47ac51d7a791))
 * **messages-recv:** cancel pending phone requests for message retries ([#2147](/github.com/iamrony777/Baileys/issues/2147)) ([674f116](github.com/iamrony777/Baileys/commits/674f116b001192232488ea090ddd81cb923251d9))
@@ -30,17 +78,14 @@
 * No session found to decrypt message and recover lost messages due to this reason ([#1822](/github.com/iamrony777/Baileys/issues/1822)) ([7d5c28c](github.com/iamrony777/Baileys/commits/7d5c28cf72e7744f35ee96c2505e4983c20bba06))
 * optimize getLIDsForPNs and add getPNsForLIDs ([#2274](/github.com/iamrony777/Baileys/issues/2274)) ([52fcad2](github.com/iamrony777/Baileys/commits/52fcad2b9c47294c4e9c441fdd3de446b9190288))
 * optimize LID migration performance and introduce cache ([#1782](/github.com/iamrony777/Baileys/issues/1782)) ([194b557](github.com/iamrony777/Baileys/commits/194b557b0f3f4aacfa4d5feecf5541f19c646e67))
-* pin music-metadata to 11.12.1 to avoid missing TypeScript declar… ([#2413](/github.com/iamrony777/Baileys/issues/2413)) ([1453b06](github.com/iamrony777/Baileys/commits/1453b06b09934cfeea9d38ffe30297ad09198b5f))
 * **proto-extract:** regenerate corrupted yarn.lock to restore install process ([#1981](/github.com/iamrony777/Baileys/issues/1981)) ([db86cdc](github.com/iamrony777/Baileys/commits/db86cdc5451c2fd81102ddd87fc8f4f51a52f595))
 * request placeholder resend for messages without encryption (CTWAads) ([#2334](/github.com/iamrony777/Baileys/issues/2334)) ([7a5b090](github.com/iamrony777/Baileys/commits/7a5b09061664f5c37d60faebc7771042b26fb059))
 * resolve race condition in decodeFrame handling and improve encryption integrity ([#2182](/github.com/iamrony777/Baileys/issues/2182)) ([5887551](github.com/iamrony777/Baileys/commits/5887551d682ca11ad3196d62c83d0d39ac24c760))
-* respect caller-provided waveform for PTT audio messages ([#2443](/github.com/iamrony777/Baileys/issues/2443)) ([8e5093c](github.com/iamrony777/Baileys/commits/8e5093c198de5c5c0230a76e8a7224f6006ebb2e))
 * send message speed, lid logic, remove messages-send useless functions ([#1794](/github.com/iamrony777/Baileys/issues/1794)) ([ae456cb](github.com/iamrony777/Baileys/commits/ae456cb3429314fe9b2765a161c9a89e1b861d4d))
 * set duplex property when uploading media to server ([#1837](/github.com/iamrony777/Baileys/issues/1837)) ([9f6e1d9](github.com/iamrony777/Baileys/commits/9f6e1d954f9a44d4e257917e89186e7d6e4c217a))
 * skip retry for expired status messages over 24 hours old ([#2280](/github.com/iamrony777/Baileys/issues/2280)) ([92d4198](github.com/iamrony777/Baileys/commits/92d4198ff174a41a41779e352da0331229088088))
 * **socket:** Prevent crashes from timeouts and fix memory leak ([#1627](/github.com/iamrony777/Baileys/issues/1627)) ([0fbce52](github.com/iamrony777/Baileys/commits/0fbce52fd3ba3ca430a94a0f1314c229c072a617))
 * store LID-PN mapping from contactAction sync ([#2266](/github.com/iamrony777/Baileys/issues/2266)) ([8ff01b8](github.com/iamrony777/Baileys/commits/8ff01b8bb32a6128e9510b4c44f49b02a34e8bd5))
-* streamline JID handling by removing redundant checks and acknowledgments ([#2352](/github.com/iamrony777/Baileys/issues/2352)) ([c727b42](github.com/iamrony777/Baileys/commits/c727b42605ec0aa9ac45ee58c64af00e87baa6b5))
 * suppress receipts for newsletter messages to prevent disconnection ([#2071](/github.com/iamrony777/Baileys/issues/2071)) ([9b012ba](github.com/iamrony777/Baileys/commits/9b012baa5c09fa80ca37a765b41d16c0c5c85e7d))
 * sync pre-keys on socket start and add specific pre-key error approach ([#1663](/github.com/iamrony777/Baileys/issues/1663)) ([8f21a67](github.com/iamrony777/Baileys/commits/8f21a67e4ad3c027a9c83ef64417bf63462e308e))
 * **utils.normalizeMessageContent:** add associatedChildMessage as one of the options to normalize ([#1874](/github.com/iamrony777/Baileys/issues/1874)) ([a1d69f7](github.com/iamrony777/Baileys/commits/a1d69f72c95b94eb6ab5e1ce0b341bdb6bf8cf60))
@@ -51,14 +96,11 @@
 
 * add enable/disable link preview privacy ([#1675](/github.com/iamrony777/Baileys/issues/1675)) ([aba3ecf](github.com/iamrony777/Baileys/commits/aba3ecf9693dc4caa31151b3553778cdbedd77cb))
 * add expiration key in group message ([#1790](/github.com/iamrony777/Baileys/issues/1790)) ([7b0e39f](github.com/iamrony777/Baileys/commits/7b0e39f44310a54709a9baa3deb4935c2e88a11f))
-* add initial username INBOUND and Usync support ([#2480](/github.com/iamrony777/Baileys/issues/2480)) ([25a4ef7](github.com/iamrony777/Baileys/commits/25a4ef73dfb31b20b01e4fd971ff51b58689e6d1))
 * add interactive message support (buttons, lists, carousels, albums) ([e6652d8](github.com/iamrony777/Baileys/commits/e6652d83dcac2f6128ba9835cd3425dca5841c05))
 * add support for FB and Interop JID encoding/decoding and empty strings ([#2189](/github.com/iamrony777/Baileys/issues/2189)) ([c392d4c](github.com/iamrony777/Baileys/commits/c392d4ce6cd461a480d38fb7332aa40b94718fce))
-* album message sending ([#2058](/github.com/iamrony777/Baileys/issues/2058)) ([d981196](github.com/iamrony777/Baileys/commits/d9811963d25dcb3cc98f7c254db91e7995c86eaa))
 * **appstate:** emit setting events ([#2057](/github.com/iamrony777/Baileys/issues/2057)) ([925ed6a](github.com/iamrony777/Baileys/commits/925ed6a7b3603031b8b7ac35e7a01d2ec22c9bd0))
 * **business:** change profile/cover photo and manage quick replies ([#1724](/github.com/iamrony777/Baileys/issues/1724)) ([50fc83b](github.com/iamrony777/Baileys/commits/50fc83b0086f2f1592135dab670fc546c4731ec9))
 * **call:** add caller phone number to offer call event ([#2190](/github.com/iamrony777/Baileys/issues/2190)) ([23156c8](github.com/iamrony777/Baileys/commits/23156c833ebbe5d328e66d884d7d44bb40b81821))
-* complete tctoken lifecycle with expiration, pruning and re-issuance ([#2339](/github.com/iamrony777/Baileys/issues/2339)) ([402f479](github.com/iamrony777/Baileys/commits/402f479ee8535fa20fa77f6913877a49625f116f))
 * event buffer should use logger.debug instead of logger.info ([#1689](/github.com/iamrony777/Baileys/issues/1689)) ([be3d869](github.com/iamrony777/Baileys/commits/be3d869cae5866ccf512de0364db01e188b34fac))
 * eventMessage sending / call link creation ([#1677](/github.com/iamrony777/Baileys/issues/1677)) ([084761d](github.com/iamrony777/Baileys/commits/084761dc31278490398be758bc6d84635bf4f082))
 * **events:** decrypt event responses ([#2056](/github.com/iamrony777/Baileys/issues/2056)) ([40f128d](github.com/iamrony777/Baileys/commits/40f128d88aa6a16c3015e3eb7db1a76d2441b0ff))
@@ -77,7 +119,6 @@
 ### Performance Improvements
 
 * **addTransactionCapability:** streamline transaction handling and improve concurrency control ([#1887](/github.com/iamrony777/Baileys/issues/1887)) ([051b5fc](github.com/iamrony777/Baileys/commits/051b5fc220edfcafbeed422b289311f74c2b94a7))
-* optimize history sync memory and CPU usage ([#2333](/github.com/iamrony777/Baileys/issues/2333)) ([77c8d3f](github.com/iamrony777/Baileys/commits/77c8d3f718f0cdd46d96f4f7d3de22d30c0cd5bc))
 * reduce DB calls during sync with caching and batching ([#2316](/github.com/iamrony777/Baileys/issues/2316)) ([fa2a837](github.com/iamrony777/Baileys/commits/fa2a837a4acefa859f5b4f86d02125b91eb0b9b1))
 
 ## [6.7.19-3](github.com/iamrony777/Baileys/compare/v6.7.19-2...v6.7.19-3) (2025-08-13)

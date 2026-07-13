@@ -7,7 +7,7 @@ hooks:
   after:bump:
     - "npm run changelog:update"
     - rm -rf lib
-    - "npm publish"
+    - "npm publish --tag latest"
 
 # automatic publish from github workflow
 npm:
