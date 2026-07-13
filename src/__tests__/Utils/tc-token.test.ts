@@ -404,6 +404,7 @@ describe('buildTcTokenFromJid', () => {
 		expect(result).toHaveLength(1)
 		const node = result![0]!
 		expect(node.tag).toBe('tctoken')
+		expect(node.attrs).toEqual({ t: RECENT_TS })
 		expect(node.content).toBe(VALID_TOKEN)
 	})
 
@@ -490,6 +491,7 @@ describe('buildTcTokenFromJid', () => {
 		expect(result![0]).toBe(existingNode)
 		const appended = result![1]!
 		expect(appended.tag).toBe('tctoken')
+		expect(appended.attrs).toEqual({ t: RECENT_TS })
 		expect(appended.content).toBe(VALID_TOKEN)
 	})
 
@@ -525,11 +527,27 @@ describe('buildTcTokenFromJid', () => {
 
 		expect(result).toBeUndefined()
 	})
+
+	it('does not append tctoken to baseContent when token has no timestamp', async () => {
+		// @ts-ignore
+		mockKeys.get.mockResolvedValue({ [TEST_JID]: { token: VALID_TOKEN } })
+		const existingNode: BinaryNode = { tag: 'picture', attrs: { type: 'image' } }
+
+		const result = await buildTcTokenFromJid({
+			authState: { keys: mockKeys },
+			getLIDForPN: noopGetLID,
+			jid: TEST_JID,
+			baseContent: [existingNode]
+		})
+
+		expect(result).toEqual([existingNode])
+		expect(mockKeys.set).toHaveBeenCalledWith({ tctoken: { [TEST_JID]: null } })
+	})
 })
 
 describe('SERVER_ERROR_CODES', () => {
-	it('MissingTcToken is 463', () => {
-		expect(SERVER_ERROR_CODES.MissingTcToken).toBe('463')
+	it('MessageAccountRestriction is 463', () => {
+		expect(SERVER_ERROR_CODES.MessageAccountRestriction).toBe('463')
 	})
 
 	it('SmaxInvalid is 479', () => {
@@ -576,6 +594,7 @@ describe('tctoken integration scenarios', () => {
 			expect(result2).toBeDefined()
 			const node2 = result2![0]!
 			expect(node2.tag).toBe('tctoken')
+			expect(node2.attrs).toEqual({ t: recentTs })
 			expect(node2.content).toBe(TOKEN_A)
 		})
 	})
@@ -603,6 +622,7 @@ describe('tctoken integration scenarios', () => {
 			const result2 = await buildTcTokenFromJid({ authState: { keys: mockKeys }, getLIDForPN: noopGetLID, jid: JID_A })
 			expect(result2).toBeDefined()
 			const freshNode = result2![0]!
+			expect(freshNode.attrs).toEqual({ t: freshTs })
 			expect(freshNode.content).toBe(TOKEN_B)
 		})
 	})
